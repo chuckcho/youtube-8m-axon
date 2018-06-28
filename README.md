@@ -15,8 +15,10 @@ python train.py
   --feature_sizes='1024,128' \
   --train_data_pattern=${HOME}/yt8m/v2/frame/train???[13579].tfrecord \
   --train_dir ./sample_model \
+  --batch_size=256 \
   --start_new_model
 ```
+Batch size of 256 works on a GPU with 12GB memory. [`train-baseline-its-getting-dark.sh`](train-baseline-its-getting-dark.sh) run this command, intended to work on `dextro-its-getting-dark` machine.
 
 ### Baseline performance (GAP)
 The GAP performance of the final model, evaluated on an Axon-official validate set should be approximately XX.XX% (TODO). The following was used to run evaluation (note the validation is one tenth of the whole validation dataset).
