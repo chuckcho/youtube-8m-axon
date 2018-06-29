@@ -54,7 +54,7 @@ python eval.py \
   --top_k=50 \
   --check_point=64140
 ```
-For three different trainings (yet identical params/settings), I was able to get GAP values of *84.73%, 85.48%, 85.44%*.
+For three different trainings (yet identical params/settings), GAP values of *84.73%, 85.48%, 85.44%* were obtained.
 
 ### Inference for test data
 Likewise, the following will generate a csv file for kaggle submission:
@@ -83,3 +83,5 @@ python inference.py \
   --check_point=64140
 ```
 `top_k` of 50 was used because in many cases inference results from multiple models will be blended and at the last stage, and only 20 best labels will be selected.
+The following command will truncate top 20 labels from csv file generated with `top_k` > 20 (without having to run inference.py again with `top_k`=20):
+`cat $IN | awk -v n=41 'n==c{exit}n-c>=NF{print;c+=NF;next}{for(i=1;i<=n-c;i++)printf "%s ",$i;print x}' > $OUT`
