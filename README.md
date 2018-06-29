@@ -6,11 +6,11 @@ This repo contains all the codes and scripts for youtube-8m-2018 kaggle challeng
 Based on some quick experiments, last year's winning method appears a superb starting point. (1) Very fast convergence. (2) Very robust GAP result. (3) More stable training, hence, easy to reproduce. (I've seen training unstabilities using Google's official starter kit) Their code is from: https://github.com/antoine77340/Youtube-8M-WILLOW. Slight modifications were made to address data format changes, and their code is in [willow directory](willow).
 
 ### Frame-level NetVLAD with context-gate model as baseline
-Run the following for the baseline model. Note that we use a half of the training data for faster training and ease of comparing with model changes. See: https://axon.quip.com/bOpyAw3mGmb3/YouTube-8M-Using-Subset-of-Validation-Set-to-Increase-Speed-of-Inference for details.
+Run the following for the baseline model (of course, check data directory before running). Note that we use a half of the training data for faster training and ease of comparing with model changes. See: https://axon.quip.com/bOpyAw3mGmb3/YouTube-8M-Using-Subset-of-Validation-Set-to-Increase-Speed-of-Inference for details.
 ```
 cd willow
 python train.py \
-  --train_data_pattern="/media/6TB/videos/yt8m/frame/train*[13579].tfrecord" \
+  --train_data_pattern="/media/6TB/videos/yt8m-v2/frame/train*[13579].tfrecord" \
   --model=NetVLADModelLF \
   --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe \
   --frame_features=True \
@@ -34,7 +34,7 @@ The GAP performance of the final model, evaluated on an Axon-official validate s
 ```
 cd willow
 python eval.py \
-  --eval_data_pattern="/media/6TB/videos/yt8m/frame/validate???5.tfrecord" \
+  --eval_data_pattern="/media/6TB/videos/yt8m-v2/frame/validate???5.tfrecord" \
   --model=NetVLADModelLF \
   --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe \
   --frame_features=True \
@@ -62,7 +62,7 @@ Likewise, the following will generate a csv file for kaggle submission:
 cd willow
 python inference.py \
   --output_file=test_gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe.csv \
-  --input_data_pattern="/media/6TB/videos/yt8m/frame/test????.tfrecord" \
+  --input_data_pattern="/media/6TB/videos/yt8m-v2/frame/test????.tfrecord" \
   --model=NetVLADModelLF \
   --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe \
   --frame_features=True \
@@ -80,6 +80,6 @@ python inference.py \
   --moe_prob_gating=True \
   --run_once=True \
   --top_k=50 \
-  --check_point=42575
+  --check_point=64140
 ```
 `top_k` of 50 was used because in many cases inference results from multiple models will be blended and at the last stage, and only 20 best labels will be selected.
