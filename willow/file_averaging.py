@@ -32,7 +32,7 @@ def read_models(model_weights, blend=None):
             f.readline()
             for l in f:
                 id, r = l.split(',')
-                id, r = int(id), r.split(' ')
+                r = r.split(' ')
                 n = len(r) // 2
                 for i in range(0, n, 2):
                     k = int(r[i])
@@ -48,7 +48,7 @@ def write_models(blend, file_name, total_weight):
             l = ' '.join(['{} {:{}f}'.format(t[0]
                                             , float(t[1]) / 10 ** (SIGFIGS - 1) / total_weight
                                             , SIGFIGS) for t in v.most_common(20)])
-            f.write(','.join([str(id), l + '\n']))
+            f.write(','.join([id, l + '\n']))
     return None
 
 
