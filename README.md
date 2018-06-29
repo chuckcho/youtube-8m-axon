@@ -12,7 +12,7 @@ cd willow
 python train.py \
   --train_data_pattern="/media/6TB/videos/yt8m/frame/train*[13579].tfrecord" \
   --model=NetVLADModelLF \
-  --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe-2 \
+  --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe \
   --frame_features=True \
   --feature_names="rgb,audio" \
   --feature_sizes="1024,128" \
@@ -36,7 +36,7 @@ cd willow
 python eval.py \
   --eval_data_pattern="/media/6TB/videos/yt8m/frame/validate???5.tfrecord" \
   --model=NetVLADModelLF \
-  --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe-2 \
+  --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe \
   --frame_features=True \
   --feature_names="rgb,audio" \
   --feature_sizes="1024,128" \
