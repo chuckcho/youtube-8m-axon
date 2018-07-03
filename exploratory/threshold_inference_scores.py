@@ -13,8 +13,13 @@ def pairwise(t):
   return izip(it,it)
 
 threshold = .5
-inf_csv = 'val_gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe-ens2.csv'
-label_csv = 'val_gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe-ens2-label-threshold_0.5.txt'
+show_label_names = True
+inf_csv = 'val_gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe-2-cp64140.csv'
+label_csv = 'val_gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe-2-cp64140-threshold_0.5-label_names.txt'
+
+if show_label_names:
+    import pandas as pd
+    labels_df = pd.read_csv('../label_names_2018_fixed.csv')
 
 out_fid = open(label_csv, 'w')
 with open(inf_csv, 'r') as fid:
@@ -31,4 +36,16 @@ with open(inf_csv, 'r') as fid:
         s = float(s)
         if s >= threshold:
             valid_labels.append(l)
-    out_fid.write(vid + ": " + " ".join(str(x) for x  in sorted(valid_labels)) + "\n")
+    valid_labels = sorted(valid_labels)
+
+    if show_label_names:
+        label_names = []
+        for label_id in valid_labels:
+            # some labels ids are missing so have put try/except
+            try:
+                label_names.append(str(labels_df[labels_df['label_id']==label_id]['label_name'].values[0]))
+            except:
+                continue
+        out_fid.write(vid + ": " + str(label_names) + "\n")
+    else:
+        out_fid.write(vid + ": " + " ".join(str(x) for x in valid_labels) + "\n")
