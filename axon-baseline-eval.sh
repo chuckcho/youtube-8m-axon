@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
 # data_path should be good for ALL seattle GPU boxes
-data_path = "/media/6TB/videos/yt8m-v2/frame"
+data_path="/media/6TB/video/yt8m-v2/frame"
 
 # validation set for experimental/exploratory stage
 # see: https://axon.quip.com/bOpyAw3mGmb3/YouTube-8M-Axon-Official-TrainValidate-Set
-axon_val_set = "${data_path}/validate???5.tfrecord"
+axon_val_set="${data_path}/validate???5.tfrecord"
 
 # be courteous, don't claim all GPU's! ;)
 export CUDA_VISIBLE_DEVICES=1

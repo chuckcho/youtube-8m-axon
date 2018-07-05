@@ -10,10 +10,10 @@
 ##############################################################################
 
 # data_path should be good for ALL seattle GPU boxes
-data_path = "/media/6TB/videos/yt8m-v2/frame"
+data_path="/media/6TB/video/yt8m-v2/frame"
 
 # use ALL test examples
-axon_test_set = "${data_path}/test????.tfrecord"
+axon_test_set="${data_path}/test????.tfrecord"
 
 # be courteous, don't claim all GPU's! ;)
 export CUDA_VISIBLE_DEVICES=3
