@@ -50,9 +50,10 @@ if __name__ == "__main__":
                        "How many examples to process per batch.")
   flags.DEFINE_integer("num_readers", 8,
                        "How many threads to use for reading input files.")
-  flags.DEFINE_boolean("run_once", False, "Whether to run eval only once.")
+  flags.DEFINE_boolean("run_once", True, "Whether to run eval only once.")
   flags.DEFINE_integer("top_k", 20, "How many predictions to output per video.")
-
+  flags.DEFINE_integer("check_point", -1,
+                       "Model checkpoint to load, -1 for latest.")
 
 def find_class_by_name(name, modules):
   """Searches the provided modules for the named class and returns it."""
@@ -194,7 +195,11 @@ def evaluation_loop(video_id_batch, prediction_batch, label_batch, loss,
 
   global_step_val = -1
   with tf.Session() as sess:
-    latest_checkpoint = get_latest_checkpoint()
+    if FLAGS.check_point < 0:
+      latest_checkpoint = get_latest_checkpoint()
+    else:
+      latest_checkpoint = os.path.join(FLAGS.train_dir, "model.ckpt-" + str(FLAGS.check_point))
+
     if latest_checkpoint:
       logging.info("Loading checkpoint for eval: " + latest_checkpoint)
       # Restores from checkpoint

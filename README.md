@@ -1,6 +1,6 @@
 # YouTube-8M Challenge (2018) for Axon
-This README is Axon-specific documentation. See the [original google's README](README-google.md).
-This repo contains all the codes and scripts for youtube-8m-2018 kaggle challenge.
+This README is Axon-specific documentation. See the [original google's README](README-google.md). Also, see the [willow's README](README-willow.md).
+This repo contains all the codes and scripts for youtube-8m-2018 kaggle challenge and the [last year's best model](https://github.com/antoine77340/Youtube-8M-WILLOW) was integrated.
 
 ## Baseline training
 Based on some quick experiments, last year's winning method appears a superb starting point. (1) Very fast convergence. (2) Very robust GAP result. (3) More stable training, hence, easy to reproduce. (I've seen training unstabilities using Google's official starter kit) Their code is from: https://github.com/antoine77340/Youtube-8M-WILLOW. Slight modifications were made to address data format changes, and their code is in [willow directory](willow).
@@ -35,11 +35,7 @@ The GAP performance of the final model, evaluated on an Axon-official validate s
 cd willow
 python eval.py \
   --eval_data_pattern="/media/6TB/videos/yt8m-v2/frame/validate???5.tfrecord" \
-  --model=NetVLADModelLF \
   --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe \
-  --frame_features=True \
-  --feature_names="rgb,audio" \
-  --feature_sizes="1024,128" \
   --batch_size=200 \
   --base_learning_rate=0.0002 \
   --netvlad_cluster_size=256 \
@@ -63,11 +59,7 @@ cd willow
 python inference.py \
   --output_file=test_gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe.csv \
   --input_data_pattern="/media/6TB/videos/yt8m-v2/frame/test????.tfrecord" \
-  --model=NetVLADModelLF \
   --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe \
-  --frame_features=True \
-  --feature_names="rgb,audio" \
-  --feature_sizes="1024,128" \
   --batch_size=1024 \
   --base_learning_rate=0.0002 \
   --netvlad_cluster_size=256 \

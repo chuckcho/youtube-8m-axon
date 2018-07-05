@@ -1,25 +1,34 @@
 #!/usr/bin/env bash
 
+##############################################################################
+# if you submit the resulting inference CSV file to kaggle server, please document
+# meticulously how you trained this model or how you ensembled multiple models.
+# otherwise, we will easily lose track of all the good improvements we made, and
+# won't be able to reproduce the results! VERY VERY IMPORTANT
+# add an entry to:
+# https://axon.quip.com/nzbHAlae4bK7/Youtube-8M-Submission-to-Leaderboard
+##############################################################################
+
+# data_path should be good for ALL seattle GPU boxes
+data_path = "/media/6TB/videos/yt8m-v2/frame"
+
+# use ALL test examples
+axon_test_set = "${data_path}/test????.tfrecord"
+
+# be courteous, don't claim all GPU's! ;)
 export CUDA_VISIBLE_DEVICES=3
 
 python inference.py \
   --output_file=test_gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe.csv \
-  --input_data_pattern="/media/6TB/videos/yt8m/frame/test????.tfrecord" \
-  --model=NetVLADModelLF \
+  --input_data_pattern=${axon_test_set} \
   --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe \
-  --frame_features=True \
-  --feature_names="rgb,audio" \
-  --feature_sizes="1024,128" \
-  --batch_size=1024 \
-  --base_learning_rate=0.0002 \
   --netvlad_cluster_size=256 \
   --netvlad_hidden_size=1024 \
   --moe_l2=1e-6 \
-  --iterations=300 \
-  --learning_rate_decay=0.8 \
   --netvlad_relu=False \
   --gating=True \
   --moe_prob_gating=True \
   --run_once=True \
   --top_k=50 \
-  --check_point=42575
+  --batch_size=1024 \
+  --check_point=33209
