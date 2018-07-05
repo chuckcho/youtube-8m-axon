@@ -6,7 +6,7 @@ This README is Axon-specific documentation. See the [original google's README](R
 Based on some quick experiments, last year's winning method appears a superb starting point. (1) Very fast convergence. (2) Very robust GAP result. (3) More stable training, hence, easy to reproduce. (I've seen training unstabilities using Google's official starter kit) Their code is from: https://github.com/antoine77340/Youtube-8M-WILLOW.
 
 ### Train frame-level NetVLAD with context-gate model as baseline
-Run the following for the baseline model (of course, check data directory before running). Note that we use a half of the training data for faster training and ease of comparing with model changes. See: https://axon.quip.com/bOpyAw3mGmb3/YouTube-8M-Using-Subset-of-Validation-Set-to-Increase-Speed-of-Inference for details. See [axon-baseline-train.sh] for detail.
+Run the following for the baseline model (of course, check data directory before running). Note that we use a half of the training data for faster training and ease of comparing with model changes. See: https://axon.quip.com/bOpyAw3mGmb3/YouTube-8M-Using-Subset-of-Validation-Set-to-Increase-Speed-of-Inference for details. See [axon-baseline-train.sh](axon-baseline-train.sh) for detail.
 ```
 python train.py \
   --num_gpu=1 \
@@ -29,7 +29,7 @@ python train.py \
 ```
 
 ### Validation performance
-The GAP performance of the final model, evaluated on an Axon-official validate set should be approximatedly 85%. The following was used to run evaluation (note the validation is one tenth of the whole validation dataset). See [axon-baseline-eval.sh] for detail.
+The GAP performance of the final model trained with the above command, evaluated on an Axon-official validate set should be approximatedly 85%. The following was used to run evaluation (note the validation is one tenth of the whole validation dataset). See [axon-baseline-eval.sh](axon-baseline-eval.sh) for detail.
 ```
 python eval.py \
   --eval_data_pattern="/media/6TB/videos/yt8m-v2/frame/validate???5.tfrecord" \
@@ -44,13 +44,12 @@ python eval.py \
   --batch_size=100 \
   --check_point=33209
 ```
-For three different trainings (yet identical params/settings), GAP values of *84.73%, 85.48%, 85.44%* were obtained.
 
 ### Inference for test data
-If you submit the resulting inference CSV file to kaggle server, please document meticulously how you trained this model and/or how you ensembled multiple models.  Otherwise, we will easily lose track of all the good improvements we made, and won't be able to reproduce the results!
-Add an entry to: [https://axon.quip.com/nzbHAlae4bK7/Youtube-8M-Submission-to-Leaderboard].
+If you submit the resulting inference CSV file to kaggle server, please document meticulously how you trained that model and/or how you ensembled multiple models (what models, weights for ensembling if not uniform).  Otherwise, we will easily lose track of all the good improvements we made, and won't be able to reproduce the results!
+Add an entry to: https://axon.quip.com/nzbHAlae4bK7/Youtube-8M-Submission-to-Leaderboard.
 
-The following will generate a csv file for kaggle submission (see [axon-baseline-inference.sh] for detail):
+The following will generate a csv file for kaggle submission (see [axon-baseline-inference.sh](axon-baseline-inference.sh) for detail):
 ```
 python inference.py \
   --output_file=test_gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe.csv \
