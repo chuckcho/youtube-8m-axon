@@ -51,6 +51,21 @@ class CrossEntropyLoss(BaseLoss):
       return tf.reduce_mean(tf.reduce_sum(cross_entropy_loss, 1))
 
 
+class SparsemaxLoss(BaseLoss):
+  """Calculate the sparsemax loss between the predictions and labels.
+  """
+
+  def calculate_loss(self, predictions, labels, **unused_params):
+    with tf.name_scope("loss_sparsemax"):
+      float_labels = tf.cast(labels, tf.float32)
+      # predictions are really "logits" as no final_activation has been applied.
+      logits = predictions
+      # convert logits into predictions using sparsemax()
+      predictions = tf.contrib.sparsemax.sparsemax(predictions)
+      return tf.contrib.sparsemax.sparsemax_loss(
+              logits, predictions, float_labels)
+
+
 class HingeLoss(BaseLoss):
   """Calculate the hinge loss between the predictions and labels.
 

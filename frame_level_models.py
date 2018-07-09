@@ -107,6 +107,10 @@ flags.DEFINE_bool("lstm_backward", False, "BW reading for LSTM")
 
 flags.DEFINE_bool("fc_dimred", True, "Adding FC dimred after pooling")
 
+# chuck's experiment: softmax vs sparsemax
+# see: https://arxiv.org/pdf/1602.02068.pdf
+flags.DEFINE_string("final_activation", "softmax", 'Final activation layer')
+
 class FrameLevelLogisticModel(models.BaseModel):
 
   def create_model(self, model_input, vocab_size, num_frames, **unused_params):
@@ -143,12 +147,13 @@ class FrameLevelLogisticModel(models.BaseModel):
     return {"predictions": output}
 
 class LightVLAD():
-    def __init__(self, feature_size,max_frames,cluster_size, add_batch_norm, is_training):
+    def __init__(self, feature_size,max_frames,cluster_size, add_batch_norm, is_training, final_activation='softmax'):
         self.feature_size = feature_size
         self.max_frames = max_frames
         self.is_training = is_training
         self.add_batch_norm = add_batch_norm
         self.cluster_size = cluster_size
+        self.final_activation = final_activation
 
     def forward(self,reshaped_input):
 
@@ -172,7 +177,13 @@ class LightVLAD():
           tf.summary.histogram("cluster_biases", cluster_biases)
           activation += cluster_biases
 
-        activation = tf.nn.softmax(activation)
+        if self.final_activation == 'softmax':
+          activation = tf.nn.softmax(activation)
+        elif self.final_activation == 'sparsemax':
+          # just pass logits
+          pass
+        else:
+          raise Exception('final activation was not set ("softmax" or "sparsemax")')
 
         activation = tf.reshape(activation, [-1, self.max_frames, self.cluster_size])
 
@@ -190,12 +201,13 @@ class LightVLAD():
         return vlad
 
 class NetVLAD():
-    def __init__(self, feature_size,max_frames,cluster_size, add_batch_norm, is_training):
+    def __init__(self, feature_size,max_frames,cluster_size, add_batch_norm, is_training, final_activation='softmax'):
         self.feature_size = feature_size
         self.max_frames = max_frames
         self.is_training = is_training
         self.add_batch_norm = add_batch_norm
         self.cluster_size = cluster_size
+        self.final_activation = final_activation
 
     def forward(self,reshaped_input):
 
@@ -221,7 +233,14 @@ class NetVLAD():
           tf.summary.histogram("cluster_biases", cluster_biases)
           activation += cluster_biases
 
-        activation = tf.nn.softmax(activation)
+        if self.final_activation == 'softmax':
+          activation = tf.nn.softmax(activation)
+        elif self.final_activation == 'sparsemax':
+          # just pass logits
+          pass
+        else:
+          raise Exception('final activation was not set ("softmax" or "sparsemax")')
+
         tf.summary.histogram("cluster_output", activation)
 
         activation = tf.reshape(activation, [-1, self.max_frames, self.cluster_size])
@@ -249,12 +268,13 @@ class NetVLAD():
         return vlad
 
 class NetVLAGD():
-    def __init__(self, feature_size,max_frames,cluster_size, add_batch_norm, is_training):
+    def __init__(self, feature_size,max_frames,cluster_size, add_batch_norm, is_training, final_activation='softmax'):
         self.feature_size = feature_size
         self.max_frames = max_frames
         self.is_training = is_training
         self.add_batch_norm = add_batch_norm
         self.cluster_size = cluster_size
+        self.final_activation = final_activation
 
     def forward(self,reshaped_input):
 
@@ -277,7 +297,13 @@ class NetVLAGD():
             [cluster_size],
             initializer = tf.random_normal_initializer(stddev=1 / math.sqrt(self.feature_size)))
 
-        activation = tf.nn.softmax(activation)
+        if self.final_activation == 'softmax':
+          activation = tf.nn.softmax(activation)
+        elif self.final_activation == 'sparsemax':
+          # just pass logits
+          pass
+        else:
+          raise Exception('final activation was not set ("softmax" or "sparsemax")')
 
         activation = tf.reshape(activation, [-1, self.max_frames, self.cluster_size])
 
@@ -632,6 +658,7 @@ class NetVLADModelLF(models.BaseModel):
     remove_diag = FLAGS.gating_remove_diag
     lightvlad = FLAGS.lightvlad
     vlagd = FLAGS.vlagd
+    final_activation = FLAGS.final_activation
 
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     if random_frames:
@@ -646,14 +673,14 @@ class NetVLADModelLF(models.BaseModel):
     reshaped_input = tf.reshape(model_input, [-1, feature_size])
 
     if lightvlad:
-      video_NetVLAD = LightVLAD(1024,max_frames,cluster_size, add_batch_norm, is_training)
-      audio_NetVLAD = LightVLAD(128,max_frames,cluster_size/2, add_batch_norm, is_training)
+      video_NetVLAD = LightVLAD(1024,max_frames,cluster_size, add_batch_norm, is_training, final_activation=final_activation)
+      audio_NetVLAD = LightVLAD(128,max_frames,cluster_size/2, add_batch_norm, is_training, final_activation=final_activation)
     elif vlagd:
-      video_NetVLAD = NetVLAGD(1024,max_frames,cluster_size, add_batch_norm, is_training)
-      audio_NetVLAD = NetVLAGD(128,max_frames,cluster_size/2, add_batch_norm, is_training)
+      video_NetVLAD = NetVLAGD(1024,max_frames,cluster_size, add_batch_norm, is_training, final_activation=final_activation)
+      audio_NetVLAD = NetVLAGD(128,max_frames,cluster_size/2, add_batch_norm, is_training, final_activation=final_activation)
     else:
-      video_NetVLAD = NetVLAD(1024,max_frames,cluster_size, add_batch_norm, is_training)
-      audio_NetVLAD = NetVLAD(128,max_frames,cluster_size/2, add_batch_norm, is_training)
+      video_NetVLAD = NetVLAD(1024,max_frames,cluster_size, add_batch_norm, is_training, final_activation=final_activation)
+      audio_NetVLAD = NetVLAD(128,max_frames,cluster_size/2, add_batch_norm, is_training, final_activation=final_activation)
 
     if add_batch_norm:# and not lightvlad:
       reshaped_input = slim.batch_norm(
