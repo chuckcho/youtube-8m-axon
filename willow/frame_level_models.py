@@ -673,7 +673,12 @@ class NetVLADModelLF(models.BaseModel):
     hidden1_weights = tf.get_variable("hidden1_weights",
       [vlad_dim, hidden1_size],
       initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(cluster_size)))
-       
+
+    self.correlationMat = tf.placeholder(tf.float32, [hidden1_size, hidden1_size])
+    regularizer = tf.trace(tf.matmul(tf.matmul(hidden1_weights, self.correlationMat), tf.transpose(hidden1_weights)))
+    tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, regularizer)
+     
+    self.x = tf.placeholder(tf.float32)  
     activation = tf.matmul(vlad, hidden1_weights)
 
     if add_batch_norm and relu:
@@ -729,11 +734,11 @@ class NetVLADModelLF(models.BaseModel):
                                FLAGS.video_level_classifier_model)
 
 
-    return aggregated_model().create_model(
+    return (hidden1_weights, aggregated_model().create_model(
         model_input=activation,
         vocab_size=vocab_size,
         is_training=is_training,
-        **unused_params)
+        **unused_params))
   
 class DbofModelLF(models.BaseModel):
   """Creates a Deep Bag of Frames model.

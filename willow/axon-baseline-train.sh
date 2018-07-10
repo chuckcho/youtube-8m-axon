@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=0
 
 python train.py \
-  --train_data_pattern="/media/6TB/videos/yt8m/frame/train*[13579].tfrecord" \
+  --train_data_pattern="/media/6TB/video/yt8m-v2/frame/train*[13579].tfrecord" \
   --model=NetVLADModelLF \
-  --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe-2 \
+  --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe-with-correlation-regularize \
   --frame_features=True \
   --feature_names="rgb,audio" \
   --feature_sizes="1024,128" \

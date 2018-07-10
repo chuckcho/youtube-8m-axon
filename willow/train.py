@@ -30,6 +30,8 @@ from tensorflow import flags
 from tensorflow import gfile
 from tensorflow import logging
 import utils
+import numpy as np
+from scipy import linalg
 
 FLAGS = flags.FLAGS
 
@@ -241,11 +243,14 @@ def build_graph(reader,
   model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
 
   with tf.name_scope("model"):
-    result = model.create_model(
+    hidden1_weights, result = model.create_model(
         model_input,
         num_frames=num_frames,
         vocab_size=reader.num_classes,
         labels=labels_batch)
+   
+    print 'hidden1_weights'
+    print hidden1_weights    
 
     for variable in slim.get_model_variables():
       tf.summary.histogram(variable.op.name, variable)
@@ -296,6 +301,7 @@ def build_graph(reader,
     tf.add_to_collection("num_frames", num_frames)
     tf.add_to_collection("labels", tf.cast(labels_batch, tf.float32))
     tf.add_to_collection("train_op", train_op)
+    tf.add_to_collection("hidden1_weights", hidden1_weights)
 
 
 class Trainer(object):
@@ -324,6 +330,7 @@ class Trainer(object):
     self.max_steps_reached = False
     self.export_model_steps = export_model_steps
     self.last_model_export_step = 0
+    self.correlationMat = np.identity(1024, dtype=np.float32)
 
     if self.is_master and self.task.index > 0:
       raise StandardError("%s: Only one replica of master expected",
@@ -358,6 +365,9 @@ class Trainer(object):
         labels = tf.get_collection("labels")[0]
         train_op = tf.get_collection("train_op")[0]
         init_op = tf.global_variables_initializer()
+       
+        weightMat = tf.get_collection("hidden1_weights")[0]
+
 
     sv = tf.train.Supervisor(
         graph,
@@ -378,8 +388,13 @@ class Trainer(object):
 
           batch_start_time = time.time()
           _, global_step_val, loss_val, predictions_val, labels_val = sess.run(
-              [train_op, global_step, loss, predictions, labels])
+              [train_op, global_step, loss, predictions, labels], {self.model.correlationMat: self.correlationMat})
           seconds_per_batch = time.time() - batch_start_time
+
+          # update correlationMat
+         # symmetricMat = np.real(linalg.sqrtm(np.matmul(np.transpose(weightMat_val), weightMat_val)))
+         # self.correlationMat = symmetricMat / np.trace(symmetricMat)
+         # print 'correlationMat trace', np.trace(self.correlationMat)
 
           if self.max_steps and self.max_steps <= global_step_val:
             self.max_steps_reached = True

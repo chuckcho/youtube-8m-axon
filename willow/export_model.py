@@ -96,7 +96,7 @@ class ModelExporter(object):
     model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
 
     with tf.name_scope("model"):
-      result = self.model.create_model(
+      _, result = self.model.create_model(
           model_input,
           num_frames=num_frames,
           vocab_size=self.reader.num_classes,
