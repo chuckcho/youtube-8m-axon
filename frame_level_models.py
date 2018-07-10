@@ -180,8 +180,7 @@ class LightVLAD():
         if self.final_activation == 'softmax':
           activation = tf.nn.softmax(activation)
         elif self.final_activation == 'sparsemax':
-          # just pass logits
-          pass
+          activation = tf.contrib.sparsemax.sparsemax(activation)
         else:
           raise Exception('final activation was not set ("softmax" or "sparsemax")')
 
@@ -236,8 +235,7 @@ class NetVLAD():
         if self.final_activation == 'softmax':
           activation = tf.nn.softmax(activation)
         elif self.final_activation == 'sparsemax':
-          # just pass logits
-          pass
+          activation = tf.contrib.sparsemax.sparsemax(activation)
         else:
           raise Exception('final activation was not set ("softmax" or "sparsemax")')
 
@@ -300,8 +298,7 @@ class NetVLAGD():
         if self.final_activation == 'softmax':
           activation = tf.nn.softmax(activation)
         elif self.final_activation == 'sparsemax':
-          # just pass logits
-          pass
+          activation = tf.contrib.sparsemax.sparsemax(activation)
         else:
           raise Exception('final activation was not set ("softmax" or "sparsemax")')
 

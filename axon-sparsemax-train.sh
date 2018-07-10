@@ -15,7 +15,7 @@ python train.py \
   --train_data_pattern="${axon_train_set}" \
   --train_dir=baseline-sparsemax \
   --model=NetVLADModelLF \
-  --final_activation=sparsemax \
+  --final_activation=softmax \
   --label_loss=SparsemaxLoss \
   --frame_features=True \
   --feature_names="rgb,audio" \

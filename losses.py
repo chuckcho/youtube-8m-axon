@@ -58,10 +58,10 @@ class SparsemaxLoss(BaseLoss):
   def calculate_loss(self, predictions, labels, **unused_params):
     with tf.name_scope("loss_sparsemax"):
       float_labels = tf.cast(labels, tf.float32)
-      # predictions are really "logits" as no final_activation has been applied.
-      logits = predictions
-      # convert logits into predictions using sparsemax()
-      predictions = tf.contrib.sparsemax.sparsemax(predictions)
+      # convert predictions back to logits (we can ignore arbitratry scaling
+      # component as it's irrelevant in sparsemax_loss() calculation)
+      epsilon = 10e-6
+      logits = tf.log(predictions + epsilon)
       return tf.contrib.sparsemax.sparsemax_loss(
               logits, predictions, float_labels)
 
