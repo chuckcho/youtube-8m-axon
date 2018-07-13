@@ -29,7 +29,5 @@ python inference.py \
   --gating=True \
   --moe_l2=1e-6 \
   --moe_prob_gating=True \
-  --run_once=True \
   --top_k=50 \
-  --batch_size=1024 \
-  --check_point=33209
+  --batch_size=1024
