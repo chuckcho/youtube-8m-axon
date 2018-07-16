@@ -676,6 +676,10 @@ class NetVLADModelLF(models.BaseModel):
       [vlad_dim, hidden1_size],
       initializer=tf.random_normal_initializer(stddev=1 / math.sqrt(cluster_size)))
 
+    # self.correlationMat = tf.placeholder(tf.float32, [hidden1_size, hidden1_size])
+    # regularizer = tf.trace(tf.matmul(tf.matmul(hidden1_weights, self.correlationMat), tf.transpose(hidden1_weights)))
+    # tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, regularizer)
+      
     activation = tf.matmul(vlad, hidden1_weights)
 
     if add_batch_norm and relu:
@@ -728,7 +732,8 @@ class NetVLADModelLF(models.BaseModel):
     aggregated_model = getattr(video_level_models,
                                FLAGS.video_level_classifier_model)
 
-    return aggregated_model().create_model(
+    self.aggr_model = aggregated_model()
+    return self.aggr_model.create_model(
         model_input=activation,
         vocab_size=vocab_size,
         is_training=is_training,

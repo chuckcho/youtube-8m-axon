@@ -128,6 +128,14 @@ class MoeModel(models.BaseModel):
         weights_regularizer=slim.l2_regularizer(l2_penalty),
         scope="experts")
 
+    with tf.variable_scope('experts', reuse=True):
+    	expert_weights = tf.get_variable('weights')
+
+    weight_size = vocab_size * num_mixtures
+    #self.correlationMat = tf.placeholder(tf.float32, [weight_size, weight_size], name="correlationMat")
+    #regularizer = tf.trace(tf.matmul(tf.matmul(expert_weights, tf.matrix_inverse(self.correlationMat)), tf.transpose(expert_weights)))
+    #tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, regularizer)
+    
     gating_distribution = tf.nn.softmax(tf.reshape(
         gate_activations,
         [-1, num_mixtures + 1]))  # (Batch * #Labels) x (num_mixtures + 1)

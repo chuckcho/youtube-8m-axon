@@ -31,6 +31,7 @@ from tensorflow import gfile
 from tensorflow import logging
 from tensorflow.python.client import device_lib
 import utils
+import numpy as np
 
 FLAGS = flags.FLAGS
 
@@ -424,6 +425,7 @@ class Trainer(object):
         train_op = tf.get_collection("train_op")[0]
         init_op = tf.global_variables_initializer()
 
+    self.correlationMat = np.identity(7724, dtype=np.float32)
     sv = tf.train.Supervisor(
         graph,
         logdir=self.train_dir,
@@ -434,14 +436,16 @@ class Trainer(object):
         save_summaries_secs=120,
         saver=saver)
 
+#    px = graph.get_tensor_by_name('tower/correlationMat:0')
     logging.info("%s: Starting managed session.", task_as_string(self.task))
     with sv.managed_session(target, config=self.config) as sess:
       try:
         logging.info("%s: Entering training loop.", task_as_string(self.task))
+        return
         while (not sv.should_stop()) and (not self.max_steps_reached):
           batch_start_time = time.time()
           _, global_step_val, loss_val, predictions_val, labels_val = sess.run(
-              [train_op, global_step, loss, predictions, labels])
+                  [train_op, global_step, loss, predictions, labels]) #{px: self.correlationMat})
           seconds_per_batch = time.time() - batch_start_time
           examples_per_second = labels_val.shape[0] / seconds_per_batch
 
