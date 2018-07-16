@@ -20,9 +20,10 @@ python train.py \
   --feature_sizes="1024,128" \
   --netvlad_cluster_size=256 \
   --netvlad_hidden_size=1024 \
-  --moe_l2=1e-6 \
   --netvlad_relu=False \
+  --iterations=300 \
   --gating=True \
+  --moe_l2=1e-6 \
   --moe_prob_gating=True \
   --base_learning_rate=0.0002 \
   --learning_rate_decay=0.8 \
