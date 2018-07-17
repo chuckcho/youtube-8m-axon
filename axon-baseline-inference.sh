@@ -18,10 +18,25 @@ axon_test_set="${data_path}/test????.tfrecord"
 # be courteous, don't claim all GPU's! ;)
 export CUDA_VISIBLE_DEVICES=3
 
+# inference.py assumes eval.py has been already run, and created
+# inference_model.* files. If these files are not there, we'll symlinks from
+# check_point
+train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe
+check_point=380325
+top_k=50
+
+if [ ! -f ${train_dir}/inference_model.meta ]; then
+  cd ${train_dir}
+  ln -s model.ckpt-${check_point}.meta                inference_model.meta
+  ln -s model.ckpt-${check_point}.index               inference_model.index
+  ln -s model.ckpt-${check_point}.data-00000-of-00001 inference_model.data-00000-of-00001
+  cd -
+fi
+
 python inference.py \
-  --output_file=test_gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe.csv \
+  --output_file=test-${train_dir}-cp${check_point}-top${top_k}.csv \
   --input_data_pattern=${axon_test_set} \
-  --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe \
+  --train_dir=${train_dir} \
   --netvlad_cluster_size=256 \
   --netvlad_hidden_size=1024 \
   --netvlad_relu=False \
@@ -29,5 +44,5 @@ python inference.py \
   --gating=True \
   --moe_l2=1e-6 \
   --moe_prob_gating=True \
-  --top_k=50 \
+  --top_k=${top_k} \
   --batch_size=1024
