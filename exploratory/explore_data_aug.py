@@ -101,20 +101,18 @@ for vid in vid_label:
             'selected_if_subsampling': hash(vid) % ratio == 0 if min_count > 1e4 else None,
             }
 
-'''
 pickle.dump(vid_label_sampling, open('data_augmentation_info.p', 'w'))
+pickle.dump(oversampling_labels, open('data_augmentation_info_2.p', 'w'))
 
 new_label_counter = Counter(new_all_labels)
 new_counts = sorted(new_label_counter.values(), reverse=True)
 new_labels_sorted_by_samples = [x[0] for x in new_label_counter.most_common()]
-#print "label_count={}".format(counts)
 
 print "#original videos={}, after sub/over-sampling, #videos={}".format(len(vid_label), vid_count)
+
+# plot #examples per (ranked) class
 plt.loglog(new_counts, label='after sub/over-sampling')
 plt.title('# samples per class after sub/over-sampling')
 plt.grid(True)
 plt.legend()
 plt.savefig('new_num_samples_per_class.png')
-'''
-
-pickle.dump(oversampling_labels, open('data_augmentation_info_2.p', 'w'))
