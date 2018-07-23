@@ -34,7 +34,7 @@ def read_models(model_weights, blend=None):
                 id, r = l.split(',')
                 r = r.split(' ')
                 n = len(r) // 2
-                for i in range(0, n, 2):
+                for i in range(0, n * 2, 2):
                     k = int(r[i])
                     v = int(10**(SIGFIGS - 1) * float(r[i+1]))
                     blend[id][k] += w * v
