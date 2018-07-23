@@ -282,6 +282,7 @@ def build_graph(reader,
             tower_inputs[i],
             num_frames=tower_num_frames[i],
             vocab_size=reader.num_classes,
+            is_training=True,
             labels=tower_labels[i])
           for variable in slim.get_model_variables():
             tf.summary.histogram(variable.op.name, variable)
