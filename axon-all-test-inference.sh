@@ -11,8 +11,11 @@ data_path="/media/6TB/video/yt8m-v2/frame"
 
 # or, in otder to train a model for ensembling (optimum model weights)
 # we need inference on validate???5 data which we have labels for
-axon_test_set="${data_path}/validate???5.tfrecord"
-output_prefix=inference-on-validate5
+#axon_test_set="${data_path}/validate???5.tfrecord"
+
+# or for distillation
+axon_test_set="${data_path}/train????.tfrecord,${data_path}/validate???[012346789].tfrecord"
+output_prefix=inference-on-train-and-val0-4+6-9
 
 # be courteous, don't claim all GPU's! ;)
 export CUDA_VISIBLE_DEVICES=1
