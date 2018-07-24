@@ -125,6 +125,8 @@ def inference(reader, train_dir, data_pattern, out_file_location, batch_size, to
   with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess, gfile.Open(out_file_location, "w+") as out_file:
     video_id_batch, video_batch, num_frames_batch = get_input_data_tensors(reader, data_pattern, batch_size)
     checkpoint_file = os.path.join(FLAGS.train_dir, "inference_model")
+    print("-->", checkpoint_file, FLAGS.train_dir)
+    
     if not gfile.Exists(checkpoint_file + ".meta"):
       raise IOError("Cannot find %s. Did you run eval.py?" % checkpoint_file)
     meta_graph_location = checkpoint_file + ".meta"
@@ -206,7 +208,7 @@ def main(unused_argv):
   # convert feature_names and feature_sizes to lists of values
   feature_names, feature_sizes = utils.GetListOfFeatureNamesAndSizes(
       flags_dict["feature_names"], flags_dict["feature_sizes"])
-
+  
   if flags_dict["frame_features"]:
     reader = readers.YT8MFrameFeatureReader(feature_names=feature_names,
                                             feature_sizes=feature_sizes)

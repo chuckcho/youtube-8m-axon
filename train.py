@@ -31,8 +31,10 @@ from tensorflow import gfile
 from tensorflow import logging
 from tensorflow.python.client import device_lib
 import utils
+from tensorflow.python.ops.lookup_ops import HashTable, KeyValueTensorInitializer
 
 FLAGS = flags.FLAGS
+
 
 if __name__ == "__main__":
   # Dataset flags.
@@ -47,6 +49,14 @@ if __name__ == "__main__":
   flags.DEFINE_string("feature_names", "mean_rgb", "Name of the feature "
                       "to use for training.")
   flags.DEFINE_string("feature_sizes", "1024", "Length of the feature vectors.")
+
+  # distillation flags
+  flags.DEFINE_bool(
+      "distillation_as_input", False, "If set true, distillation_predictions will be given to model.")
+  flags.DEFINE_float("distillation_percent", 0.0,
+                     "If larger than 0, final_loss = distillation_loss * percent + normal_loss * (1.0 - percent).")
+  flags.DEFINE_string("distillation_input_path", "",
+                      "Path to CSV file of predictions for model distillation")
 
   # Model flags.
   flags.DEFINE_bool(
@@ -103,6 +113,106 @@ if __name__ == "__main__":
       "log_device_placement", False,
       "Whether to write the device on which every op will run into the "
       "logs on startup.")
+
+
+
+
+
+'''
+Helper Function: TensorFlow equivalent of numpy's 'repeat' function
+args:
+  seq: sequence to repeat
+  ntime: number of time to repeat
+Example: tf_repeat([1,2,3,4], 4) would return [1 1 1 1, 2 2 2 2, ...]
+'''
+def tf_repeat(seq, ntimes):
+  return tf.expand_dims(tf.squeeze(tf.reshape(tf.tile(tf.reshape(seq, (-1, 1)), (1, ntimes)), (1, -1))), -1)
+
+
+  print("Added %d lines to dictionary" % line_count)
+  return line_count
+
+
+def distillation_dict_size(input_csv_path):
+  pred_dict = {}
+  line_count = 0
+  try:
+    fid = open(input_csv_path, 'r')
+    next(fid)
+    for line in fid:
+        line_count = line_count + 1
+  except IOError:
+    print("Could not open file at %s" % input_csv_path)
+
+
+
+'''
+Model Distillation: build_distillation_dict()
+Build a python dictionary that maps
+VideoID --> Distillation Predictions
+and return the dictionary
+'''
+def build_distillation_dict(input_csv_path):
+  pred_dict = {}
+  line_count = 0
+  try:
+    fid = open(input_csv_path, 'r')
+    next(fid)
+    for line in fid:
+        line_count = line_count + 1
+        vid, label_scores = line.split(',')
+        # Add to python dict
+        pred_dict[vid] = label_scores
+  except IOError:
+    print("Could not open file at %s" % input_csv_path)
+
+  print("Added %d lines to dictionary" % line_count)
+  return pred_dict, line_count, len(label_scores)
+
+'''
+Model Distillation: get_distillation_predictions()
+Get a tensor of distillation predictions given a dictionary
+
+Args:
+  pred_dict: python dictionary mapping videoIDs to prediction strings
+  batch_size: size of batch
+  num_classes: number of classes
+  top_k: how many predictions we have for each video (usually 20)
+
+Returns:
+  A TF tensor of size BatchSize x NumClasses
+'''
+def get_distillation_predictions(pred_dict, batch_size, num_classes, top_k):
+  init = KeyValueTensorInitializer(pred_dict.keys(), pred_dict.values())
+  hash_table = HashTable(init, default_value="")
+  data = tf.placeholder(tf.string, (None,), name='data')
+  values = hash_table.lookup(data)
+
+  labels_scores_tensor = tf.sparse_tensor_to_dense(tf.string_split(values, delimiter=' '), default_value="")
+
+  # Get the labels tensor and flatten it, so that it is num_classes * top_k long
+  labels_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64))
+  labels_tensor = tf.expand_dims(tf.reshape(labels_tensor, [-1]), -1)
+
+  # Create repeating sequence to index the rows of the predictions matrix
+  row_idx = tf_repeat(tf.range(batch_size, dtype=tf.int64), top_k)
+
+  # Concat labels tensor and row indices to form indices matrix
+  indices = tf.concat([labels_tensor, row_idx], axis=1)
+
+  # Get scores and reshape to be a long vector of updates
+  scores_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64))
+  updates = tf.reshape(scores_tensor, [-1])
+
+  shape = tf.constant([num_classes, batch_size], dtype=tf.int64)
+  distillation_predictions = tf.transpose(tf.scatter_nd(indices, updates, shape))
+  return distillation_predictions
+
+
+
+
+
+
 
 def validate_class_name(flag_value, category, modules, expected_superclass):
   """Checks that the given string matches a class of the expected type.
@@ -254,11 +364,61 @@ def build_graph(reader,
   tf.summary.histogram("model/input_raw", model_input_raw)
 
   feature_dim = len(model_input_raw.get_shape()) - 1
-
   model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
+################### ----> need to define distill_labels_batch
+  # Build lookup table of distillation predictions
+  if FLAGS.distillation_as_input:
+    num_classes = reader.num_classes
+    pred_dict, num_keys, _ = build_distillation_dict(FLAGS.distillation_input_path)
+    #num_keys = distillation_dict_size(FLAGS.distillation_input_path)
+    import numpy as np
+    print(FLAGS.distillation_input_path)
+
+    				
+    place_tf_keys = tf.placeholder(tf.string, shape=np.array(pred_dict.keys()).shape, name='place_tf_keys')
+    place_tf_vals = tf.placeholder(tf.string, shape=np.array(pred_dict.values()).shape, name='place_tf_vals')
+
+    set_keys = tf.Variable(place_tf_keys)
+    set_vals = tf.Variable(place_tf_vals) 
+
+    #init = KeyValueTensorInitializer(pred_dict.keys(), pred_dict.values())
+    init = KeyValueTensorInitializer(set_keys, set_vals)
+    hash_table = HashTable(init, default_value=" ")
+    data = unused_video_id
+    values = hash_table.lookup(data)
+
+    labels_scores_tensor = tf.sparse_tensor_to_dense(tf.string_split(values, delimiter=' '), default_value="")
+
+    # Get the labels tensor and flatten it, so that it is num_classes * top_k long
+    labels_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64))
+    labels_tensor = tf.expand_dims(tf.reshape(labels_tensor, [-1]), -1)
+
+    print("label_tensor---->", labels_tensor.get_shape())
+    # Get scores and reshape to be a long vector of updates
+    scores_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64))
+    updates = tf.reshape(scores_tensor, [-1])
+
+    print("score_tensor---->update", scores_tensor.get_shape(), updates.get_shape())
+    # Create repeating sequence to index the rows of the predictions matrix
+    top_k = tf.shape(scores_tensor)[0]
+    row_idx = tf_repeat(tf.range(batch_size, dtype=tf.int64), top_k)
+
+    print("row_idx---->", row_idx.get_shape())
+    # Concat labels tensor and row indices to form indices matrix
+    indices = tf.concat([labels_tensor, row_idx], axis=1)
+
+    print("indices---->", indices.get_shape())
+    shape = tf.constant([num_classes, batch_size], dtype=tf.int64)
+    distillation_predictions = tf.transpose(tf.scatter_nd(indices, updates, shape))
+    print("dist pred shape---->", distillation_predictions.get_shape())
+
+
+
 
   tower_inputs = tf.split(model_input, num_towers)
   tower_labels = tf.split(labels_batch, num_towers)
+  if FLAGS.distillation_as_input:
+    tower_distill_preds = tf.split(distillation_predictions, num_towers)
   tower_num_frames = tf.split(num_frames, num_towers)
   tower_gradients = []
   tower_predictions = []
@@ -284,7 +444,20 @@ def build_graph(reader,
           if "loss" in result.keys():
             label_loss = result["loss"]
           else:
-            label_loss = label_loss_fn.calculate_loss(predictions, tower_labels[i])
+
+            if FLAGS.distillation_as_input:
+              p = FLAGS.distillation_percent
+              print "distillation_percent =", p
+              if p <= 0:
+                label_loss = label_loss_fn.calculate_loss(predictions, tower_labels[i])
+              elif p >= 1:
+                label_loss = label_loss_fn.calculate_loss(predictions, tower_distill_preds[i])
+              else:
+                label_loss = label_loss_fn.calculate_loss(predictions, tower_labels[i]) * (1.0 - p) \
+                         + label_loss_fn.calculate_loss(predictions, tower_distill_preds[i]) * p
+            else:
+              print "using original loss"
+              label_loss = label_loss_fn.calculate_loss(predictions, tower_labels[i])
 
           if "regularization_loss" in result.keys():
             reg_loss = result["regularization_loss"]
@@ -366,6 +539,7 @@ class Trainer(object):
     self.export_model_steps = export_model_steps
     self.last_model_export_step = 0
 
+
 #     if self.is_master and self.task.index > 0:
 #       raise StandardError("%s: Only one replica of master expected",
 #                           task_as_string(self.task))
@@ -408,21 +582,41 @@ class Trainer(object):
     target, device_fn = self.start_server_if_distributed()
 
     meta_filename = self.get_meta_filename(start_new_model, self.train_dir)
+    print('---> line 434 in train.py')
 
+    logging.info('---> line 434 in train.py')
     with tf.Graph().as_default() as graph:
       if meta_filename:
         saver = self.recover_model(meta_filename)
 
       with tf.device(device_fn):
+     
+        print('---> line 443 in train.py')
+        logging.info('---> line 443 in train.py')
+
         if not meta_filename:
-          saver = self.build_model(self.model, self.reader)
+         print('---> line 447 in train.py')
+         logging.info('---> line 447 in train.py')
+
+         saver = self.build_model(self.model, self.reader)
+
+
 
         global_step = tf.get_collection("global_step")[0]
         loss = tf.get_collection("loss")[0]
         predictions = tf.get_collection("predictions")[0]
         labels = tf.get_collection("labels")[0]
         train_op = tf.get_collection("train_op")[0]
+        
         init_op = tf.global_variables_initializer()
+
+        
+        pred_dict, num_keys, len_vals = build_distillation_dict(FLAGS.distillation_input_path)
+        place_tf_keys = tf.get_default_graph().get_tensor_by_name("place_tf_keys:0")
+        place_tf_vals = tf.get_default_graph().get_tensor_by_name("place_tf_vals:0")
+
+
+
 
     sv = tf.train.Supervisor(
         graph,
@@ -432,10 +626,14 @@ class Trainer(object):
         global_step=global_step,
         save_model_secs=15 * 60,
         save_summaries_secs=120,
-        saver=saver)
-
+        saver=saver,
+        init_feed_dict={place_tf_keys:pred_dict.keys(), place_tf_vals: pred_dict.values()})
+    
+ 
     logging.info("%s: Starting managed session.", task_as_string(self.task))
     with sv.managed_session(target, config=self.config) as sess:
+      #initialize table
+      
       try:
         logging.info("%s: Entering training loop.", task_as_string(self.task))
         while (not sv.should_stop()) and (not self.max_steps_reached):
@@ -693,3 +891,4 @@ def main(unused_argv):
 
 if __name__ == "__main__":
   app.run()
+

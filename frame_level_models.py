@@ -609,7 +609,7 @@ class NetVLADModelLF(models.BaseModel):
     'batch_size' x 'num_classes'.
   """
 
-
+  print (' --------- within NetVLADModelLF --------- \n ')
   def create_model(self,
                    model_input,
                    vocab_size,
