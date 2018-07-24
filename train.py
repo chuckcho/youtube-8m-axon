@@ -368,49 +368,51 @@ def build_graph(reader,
 ################### ----> need to define distill_labels_batch
   # Build lookup table of distillation predictions
   if FLAGS.distillation_as_input:
-    num_classes = reader.num_classes
-    pred_dict, num_keys, _ = build_distillation_dict(FLAGS.distillation_input_path)
-    #num_keys = distillation_dict_size(FLAGS.distillation_input_path)
-    import numpy as np
-    print(FLAGS.distillation_input_path)
+    with tf.device('/cpu:0'):
+
+      num_classes = reader.num_classes
+      pred_dict, num_keys, _ = build_distillation_dict(FLAGS.distillation_input_path)
+      #num_keys = distillation_dict_size(FLAGS.distillation_input_path)
+      import numpy as np
+      print(FLAGS.distillation_input_path)
 
     				
-    place_tf_keys = tf.placeholder(tf.string, shape=np.array(pred_dict.keys()).shape, name='place_tf_keys')
-    place_tf_vals = tf.placeholder(tf.string, shape=np.array(pred_dict.values()).shape, name='place_tf_vals')
+      place_tf_keys = tf.placeholder(tf.string, shape=np.array(pred_dict.keys()).shape, name='place_tf_keys')
+      place_tf_vals = tf.placeholder(tf.string, shape=np.array(pred_dict.values()).shape, name='place_tf_vals')
 
-    set_keys = tf.Variable(place_tf_keys)
-    set_vals = tf.Variable(place_tf_vals) 
+      set_keys = tf.Variable(place_tf_keys)
+      set_vals = tf.Variable(place_tf_vals) 
 
-    #init = KeyValueTensorInitializer(pred_dict.keys(), pred_dict.values())
-    init = KeyValueTensorInitializer(set_keys, set_vals)
-    hash_table = HashTable(init, default_value=" ")
-    data = unused_video_id
-    values = hash_table.lookup(data)
+      #init = KeyValueTensorInitializer(pred_dict.keys(), pred_dict.values())
+      init = KeyValueTensorInitializer(set_keys, set_vals)
+      hash_table = HashTable(init, default_value=" ")
+      data = unused_video_id
+      values = hash_table.lookup(data)
 
-    labels_scores_tensor = tf.sparse_tensor_to_dense(tf.string_split(values, delimiter=' '), default_value="")
+      labels_scores_tensor = tf.sparse_tensor_to_dense(tf.string_split(values, delimiter=' '), default_value="")
 
-    # Get the labels tensor and flatten it, so that it is num_classes * top_k long
-    labels_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64))
-    labels_tensor = tf.expand_dims(tf.reshape(labels_tensor, [-1]), -1)
+      # Get the labels tensor and flatten it, so that it is num_classes * top_k long
+      labels_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64))
+      labels_tensor = tf.expand_dims(tf.reshape(labels_tensor, [-1]), -1)
 
-    print("label_tensor---->", labels_tensor.get_shape())
-    # Get scores and reshape to be a long vector of updates
-    scores_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64))
-    updates = tf.reshape(scores_tensor, [-1])
+      print("label_tensor---->", labels_tensor.get_shape())
+      # Get scores and reshape to be a long vector of updates
+      scores_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64))
+      updates = tf.reshape(scores_tensor, [-1])
 
-    print("score_tensor---->update", scores_tensor.get_shape(), updates.get_shape())
-    # Create repeating sequence to index the rows of the predictions matrix
-    top_k = tf.shape(scores_tensor)[0]
-    row_idx = tf_repeat(tf.range(batch_size, dtype=tf.int64), top_k)
+      print("score_tensor---->update", scores_tensor.get_shape(), updates.get_shape())
+      # Create repeating sequence to index the rows of the predictions matrix
+      top_k = tf.shape(scores_tensor)[0]
+      row_idx = tf_repeat(tf.range(batch_size, dtype=tf.int64), top_k)
 
-    print("row_idx---->", row_idx.get_shape())
-    # Concat labels tensor and row indices to form indices matrix
-    indices = tf.concat([labels_tensor, row_idx], axis=1)
+      print("row_idx---->", row_idx.get_shape())
+      # Concat labels tensor and row indices to form indices matrix
+      indices = tf.concat([labels_tensor, row_idx], axis=1)
 
-    print("indices---->", indices.get_shape())
-    shape = tf.constant([num_classes, batch_size], dtype=tf.int64)
-    distillation_predictions = tf.transpose(tf.scatter_nd(indices, updates, shape))
-    print("dist pred shape---->", distillation_predictions.get_shape())
+      print("indices---->", indices.get_shape())
+      shape = tf.constant([num_classes, batch_size], dtype=tf.int64)
+      distillation_predictions = tf.transpose(tf.scatter_nd(indices, updates, shape))
+      print("dist pred shape---->", distillation_predictions.get_shape())
 
 
 
