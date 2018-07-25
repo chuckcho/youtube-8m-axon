@@ -128,9 +128,7 @@ Example: tf_repeat([1,2,3,4], 4) would return [1 1 1 1, 2 2 2 2, ...]
 def tf_repeat(seq, ntimes):
   return tf.expand_dims(tf.squeeze(tf.reshape(tf.tile(tf.reshape(seq, (-1, 1)), (1, ntimes)), (1, -1))), -1)
 
-
-  print("Added %d lines to dictionary" % line_count)
-  return line_count
+  #return tf.expand_dims(tf.reshape(tf.tile(tf.reshape(seq, (-1, 1)), (1, ntimes))), -1)
 
 
 def distillation_dict_size(input_csv_path):
@@ -143,6 +141,10 @@ def distillation_dict_size(input_csv_path):
         line_count = line_count + 1
   except IOError:
     print("Could not open file at %s" % input_csv_path)
+
+  print("Added %d lines to dictionary" % line_count)
+  return line_count
+
 
 
 
@@ -366,6 +368,7 @@ def build_graph(reader,
   feature_dim = len(model_input_raw.get_shape()) - 1
   model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
 ################### ----> need to define distill_labels_batch
+  logging.info("----------------- beginning--------")
   # Build lookup table of distillation predictions
   if FLAGS.distillation_as_input:
     with tf.device('/cpu:0'):
@@ -387,24 +390,32 @@ def build_graph(reader,
       init = KeyValueTensorInitializer(set_keys, set_vals)
       hash_table = HashTable(init, default_value=" ")
       data = unused_video_id
+      print("data---->", data.get_shape())
       values = hash_table.lookup(data)
 
       labels_scores_tensor = tf.sparse_tensor_to_dense(tf.string_split(values, delimiter=' '), default_value="")
 
       # Get the labels tensor and flatten it, so that it is num_classes * top_k long
-      labels_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64))
+      #labels_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64))
+      labels_tensor = tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64)
       labels_tensor = tf.expand_dims(tf.reshape(labels_tensor, [-1]), -1)
 
-      print("label_tensor---->", labels_tensor.get_shape())
+      logging.info("label_tensor---->", labels_tensor.get_shape())
       # Get scores and reshape to be a long vector of updates
-      scores_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64))
+      #scores_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64))
+      #updates = tf.reshape(scores_tensor, [-1])
+      scores_tensor = tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64)
       updates = tf.reshape(scores_tensor, [-1])
+
 
       print("score_tensor---->update", scores_tensor.get_shape(), updates.get_shape())
       # Create repeating sequence to index the rows of the predictions matrix
-      top_k = tf.shape(scores_tensor)[0]
+      #top_k = tf.shape(scores_tensor)[0]
+      top_k = tf.shape(scores_tensor)[1]
+      #seq = tf.range(batch_size, dtype=tf.int64)
+      #row_idx = tf.expand_dims(tf.reshape(tf.tile(tf.reshape(seq, (-1, 1)), (1, top_k))), -1)
       row_idx = tf_repeat(tf.range(batch_size, dtype=tf.int64), top_k)
-
+      
       print("row_idx---->", row_idx.get_shape())
       # Concat labels tensor and row indices to form indices matrix
       indices = tf.concat([labels_tensor, row_idx], axis=1)
@@ -511,7 +522,11 @@ def build_graph(reader,
   tf.add_to_collection("num_frames", num_frames)
   tf.add_to_collection("labels", tf.cast(labels_batch, tf.float32))
   tf.add_to_collection("train_op", train_op)
+  tf.add_to_collection("labels_tensor", labels_tensor)
+  tf.add_to_collection("unused_video_id", unused_video_id)
+  tf.add_to_collection("distillation_predictions", tf.concat(tower_distill_preds, 0))
 
+  tf.add_to_collection("row_idx", row_idx)
 
 class Trainer(object):
   """A Trainer to train a Tensorflow graph."""
@@ -584,7 +599,6 @@ class Trainer(object):
     target, device_fn = self.start_server_if_distributed()
 
     meta_filename = self.get_meta_filename(start_new_model, self.train_dir)
-    print('---> line 434 in train.py')
 
     logging.info('---> line 434 in train.py')
     with tf.Graph().as_default() as graph:
@@ -592,15 +606,8 @@ class Trainer(object):
         saver = self.recover_model(meta_filename)
 
       with tf.device(device_fn):
-     
-        print('---> line 443 in train.py')
-        logging.info('---> line 443 in train.py')
-
         if not meta_filename:
-         print('---> line 447 in train.py')
-         logging.info('---> line 447 in train.py')
-
-         saver = self.build_model(self.model, self.reader)
+          saver = self.build_model(self.model, self.reader)
 
 
 
@@ -608,10 +615,15 @@ class Trainer(object):
         loss = tf.get_collection("loss")[0]
         predictions = tf.get_collection("predictions")[0]
         labels = tf.get_collection("labels")[0]
-        train_op = tf.get_collection("train_op")[0]
-        
+        train_op = tf.get_collection("train_op")[0] 
         init_op = tf.global_variables_initializer()
 
+        labels_tensor = tf.get_collection("labels_tensor")[0]
+        
+        unused_video_id = tf.get_collection("unused_video_id")
+        distillation_predictions = tf.get_collection("distillation_predictions")[0]
+        
+        row_idx = tf.get_collection("row_idx")
         
         pred_dict, num_keys, len_vals = build_distillation_dict(FLAGS.distillation_input_path)
         place_tf_keys = tf.get_default_graph().get_tensor_by_name("place_tf_keys:0")
@@ -640,11 +652,36 @@ class Trainer(object):
         logging.info("%s: Entering training loop.", task_as_string(self.task))
         while (not sv.should_stop()) and (not self.max_steps_reached):
           batch_start_time = time.time()
-          _, global_step_val, loss_val, predictions_val, labels_val = sess.run(
-              [train_op, global_step, loss, predictions, labels])
+          _, global_step_val, loss_val, predictions_val, labels_val, labels_tensor_val, unused_video_id_val, distillation_predictions_val, row_idx_val = sess.run(
+              [train_op, global_step, loss, predictions, labels, labels_tensor, unused_video_id, distillation_predictions, row_idx])
           seconds_per_batch = time.time() - batch_start_time
           examples_per_second = labels_val.shape[0] / seconds_per_batch
+          ''' 
+          print('vid', unused_video_id_val[0])
+ 
+          print('\n')
+          print('label_tensor')
+          #print('row_idx', row_idx_val)
+          for i, el in enumerate(labels_tensor_val):
+            if i < 10:
+              print("{}  ".format(el)),
 
+          #import sys; sys.exit()
+          
+          print('--------\n')
+          print('distill_pred_b0')
+          for i, el in enumerate(distillation_predictions_val[0]):
+            if el!=0:
+              print((i, el)),
+          print('--------\n')
+          print('distill_predi_b1')
+          for i, el in enumerate(distillation_predictions_val[1]):
+            if el!=0:
+              print((i, el)),
+          print('--->', distillation_predictions_val.shape)
+          
+          print('_____')
+          '''
           if self.max_steps and self.max_steps <= global_step_val:
             self.max_steps_reached = True
 
@@ -674,6 +711,7 @@ class Trainer(object):
                                   examples_per_second), global_step_val)
             sv.summary_writer.flush()
 
+            #import sys; sys.exit()
             # Exporting the model every x steps
             time_to_export = ((self.last_model_export_step == 0) or
                 (global_step_val - self.last_model_export_step
