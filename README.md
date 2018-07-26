@@ -61,10 +61,8 @@ python inference.py \
   --netvlad_relu=False \
   --gating=True \
   --moe_prob_gating=True \
-  --run_once=True \
   --top_k=50 \
-  --batch_size=1024 \
-  --check_point=33209
+  --batch_size=1024
 ```
 `top_k` of 50 was used because in many cases inference results from multiple models will be blended and at the last stage, and only 20 best labels will be selected.
 
