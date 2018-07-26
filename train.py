@@ -269,7 +269,13 @@ def get_input_data_tensors(reader,
   """
   logging.info("Using batch size of " + str(batch_size) + " for training.")
   with tf.name_scope("train_input"):
-    files = gfile.Glob(data_pattern)
+    if ',' in data_pattern:
+      data_patterns = data_pattern.split(',')
+      files = []
+      for data_pattern in data_patterns:
+          files.extend(gfile.Glob(data_pattern))
+    else:
+      files = gfile.Glob(data_pattern)
     if not files:
       raise IOError("Unable to find training files. data_pattern='" +
                     data_pattern + "'.")
@@ -370,10 +376,15 @@ def build_graph(reader,
 ################### ----> need to define distill_labels_batch
   logging.info("----------------- beginning--------")
   # Build lookup table of distillation predictions
+
+  num_classes = reader.num_classes
+  #place_tf_temp = tf.placeholder(tf.float64, name='place_tf_temp')
+  temperature = tf.placeholder(tf.float64, shape=(1,), name='temperature')
+
+  set_temperature = tf.Variable(temperature) 
   if FLAGS.distillation_as_input:
     with tf.device('/cpu:0'):
 
-      num_classes = reader.num_classes
       pred_dict, num_keys, _ = build_distillation_dict(FLAGS.distillation_input_path)
       #num_keys = distillation_dict_size(FLAGS.distillation_input_path)
       import numpy as np
@@ -424,6 +435,9 @@ def build_graph(reader,
       shape = tf.constant([num_classes, batch_size], dtype=tf.int64)
       distillation_predictions = tf.transpose(tf.scatter_nd(indices, updates, shape))
       print("dist pred shape---->", distillation_predictions.get_shape())
+      tmp_distill_pred = tf.pow(distillation_predictions, 1 / set_temperature)
+      distillation_predictions = tmp_distill_pred / tf.tile(tf.expand_dims(tf.reduce_sum(tmp_distill_pred, axis=1), -1), (1, num_classes))
+
 
 
 
@@ -452,6 +466,9 @@ def build_graph(reader,
             tf.summary.histogram(variable.op.name, variable)
 
           predictions = result["predictions"]
+          tmp_pred = tf.pow(predictions, tf.cast(1 / set_temperature, tf.float32))
+          predictions = tmp_pred / tf.tile(tf.expand_dims(tf.reduce_sum(tmp_pred, axis=1), -1), (1, num_classes))
+
           tower_predictions.append(predictions)
 
           if "loss" in result.keys():
@@ -464,10 +481,11 @@ def build_graph(reader,
               if p <= 0:
                 label_loss = label_loss_fn.calculate_loss(predictions, tower_labels[i])
               elif p >= 1:
-                label_loss = label_loss_fn.calculate_loss(predictions, tower_distill_preds[i])
+                label_loss = label_loss_fn.calculate_loss(predictions, tower_distill_preds[i] )
               else:
+                
                 label_loss = label_loss_fn.calculate_loss(predictions, tower_labels[i]) * (1.0 - p) \
-                         + label_loss_fn.calculate_loss(predictions, tower_distill_preds[i]) * p
+                         + tf.pow(tf.cast(set_temperature, tf.float32), 2.0)*label_loss_fn.calculate_loss(predictions, tower_distill_preds[i] ) * p
             else:
               print "using original loss"
               label_loss = label_loss_fn.calculate_loss(predictions, tower_labels[i])
@@ -522,11 +540,12 @@ def build_graph(reader,
   tf.add_to_collection("num_frames", num_frames)
   tf.add_to_collection("labels", tf.cast(labels_batch, tf.float32))
   tf.add_to_collection("train_op", train_op)
-  tf.add_to_collection("labels_tensor", labels_tensor)
+  
+  if FLAGS.distillation_as_input:
+    tf.add_to_collection("labels_tensor", labels_tensor)
+    tf.add_to_collection("distillation_predictions", tf.concat(tower_distill_preds, 0))
+    tf.add_to_collection("row_idx", row_idx)
   tf.add_to_collection("unused_video_id", unused_video_id)
-  tf.add_to_collection("distillation_predictions", tf.concat(tower_distill_preds, 0))
-
-  tf.add_to_collection("row_idx", row_idx)
 
 class Trainer(object):
   """A Trainer to train a Tensorflow graph."""
@@ -618,19 +637,25 @@ class Trainer(object):
         train_op = tf.get_collection("train_op")[0] 
         init_op = tf.global_variables_initializer()
 
-        labels_tensor = tf.get_collection("labels_tensor")[0]
+        if FLAGS.distillation_as_input:
+          labels_tensor = tf.get_collection("labels_tensor")[0]
+          distillation_predictions = tf.get_collection("distillation_predictions")[0]
+          row_idx = tf.get_collection("row_idx")
+      
+          pred_dict, num_keys, len_vals = build_distillation_dict(FLAGS.distillation_input_path)
+          place_tf_keys = tf.get_default_graph().get_tensor_by_name("place_tf_keys:0")
+          place_tf_vals = tf.get_default_graph().get_tensor_by_name("place_tf_vals:0")
         
         unused_video_id = tf.get_collection("unused_video_id")
-        distillation_predictions = tf.get_collection("distillation_predictions")[0]
         
-        row_idx = tf.get_collection("row_idx")
         
-        pred_dict, num_keys, len_vals = build_distillation_dict(FLAGS.distillation_input_path)
-        place_tf_keys = tf.get_default_graph().get_tensor_by_name("place_tf_keys:0")
-        place_tf_vals = tf.get_default_graph().get_tensor_by_name("place_tf_vals:0")
+        temperature = tf.get_default_graph().get_tensor_by_name("temperature:0")
 
 
-
+    if FLAGS.distillation_as_input:
+      init_distill_dict = { place_tf_keys:pred_dict.keys(), place_tf_vals: pred_dict.values(), temperature: [2.0] }
+    else:
+      init_distill_dict = { temperature: [1.0] }
 
     sv = tf.train.Supervisor(
         graph,
@@ -641,7 +666,7 @@ class Trainer(object):
         save_model_secs=15 * 60,
         save_summaries_secs=120,
         saver=saver,
-        init_feed_dict={place_tf_keys:pred_dict.keys(), place_tf_vals: pred_dict.values()})
+        init_feed_dict=init_distill_dict)
     
  
     logging.info("%s: Starting managed session.", task_as_string(self.task))
@@ -652,10 +677,11 @@ class Trainer(object):
         logging.info("%s: Entering training loop.", task_as_string(self.task))
         while (not sv.should_stop()) and (not self.max_steps_reached):
           batch_start_time = time.time()
-          _, global_step_val, loss_val, predictions_val, labels_val, labels_tensor_val, unused_video_id_val, distillation_predictions_val, row_idx_val = sess.run(
-              [train_op, global_step, loss, predictions, labels, labels_tensor, unused_video_id, distillation_predictions, row_idx])
+          _, global_step_val, loss_val, predictions_val, labels_val = sess.run(
+              [train_op, global_step, loss, predictions, labels])
           seconds_per_batch = time.time() - batch_start_time
           examples_per_second = labels_val.shape[0] / seconds_per_batch
+          
           ''' 
           print('vid', unused_video_id_val[0])
  
@@ -711,7 +737,6 @@ class Trainer(object):
                                   examples_per_second), global_step_val)
             sv.summary_writer.flush()
 
-            #import sys; sys.exit()
             # Exporting the model every x steps
             time_to_export = ((self.last_model_export_step == 0) or
                 (global_step_val - self.last_model_export_step

@@ -5,15 +5,16 @@ data_path="/media/6TB/video/yt8m-v2/frame"
 
 # training set for experimental/exploratory stage
 # see: https://axon.quip.com/bOpyAw3mGmb3/YouTube-8M-Axon-Official-TrainValidate-Set
-axon_train_set="${data_path}/train???[13579].tfrecord"
+#axon_train_set="${data_path}/train???[13579].tfrecord"
+axon_train_set="${data_path}/train????.tfrecord,${data_path}/validate???[012346789].tfrecord"
 
 # be courteous, don't claim all GPU's! ;)
-export CUDA_VISIBLE_DEVICES=0,1,3
+export CUDA_VISIBLE_DEVICES=1
 
 python train.py \
   --num_gpu=1 \
   --train_data_pattern="${axon_train_set}" \
-  --train_dir=distill_test \
+  --train_dir=lightvlad-16-0p0 \
   --model=NetVLADModelLF \
   --frame_features=True \
   --feature_names="rgb,audio" \
@@ -28,10 +29,12 @@ python train.py \
   --base_learning_rate=0.0002 \
   --learning_rate_decay=0.8 \
   --max_step=500000 \
-  --batch_size=32 \
-  --distillation_features=True \
-  --distillation_as_input=True \
-  --distillation_percent=0.5 \
-  --distillation_input_path=baseline-pduan-train_plus_validate-cp_274278.csv
+  --batch_size=2\
+  --distillation_as_input=False \
+  --distillation_percent=0 \
+  --distillation_input_path=baseline-pduan-train_plus_validate-cp_274278.csv \
+  --lightvlad=True
+  
+#--distillation_input_path=axon_validation_pred.csv  
 
-  #--distillation_input_path=axon_validation_pred.csv  
+

@@ -13,15 +13,16 @@
 data_path="/media/6TB/video/yt8m-v2/frame"
 
 # use ALL test examples
-axon_test_set="${data_path}/test????.tfrecord"
+axon_val_set="${data_path}/validate???5.tfrecord"
 
 # be courteous, don't claim all GPU's! ;)
 export CUDA_VISIBLE_DEVICES=3
 
+train_dir="distill-vlad-16-0p95"
+
 python inference.py \
-  --output_file=TMP_test_gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe.csv \
-  --input_data_pattern=${axon_test_set} \
-  --train_dir=gatednetvladLF-256k-1024-2-0002-300iter-norelu-basic-gatedmoe \
+  --output_file="${train_dir}.csv" \
+  --input_data_pattern=${axon_val_set} \
   --netvlad_cluster_size=256 \
   --netvlad_hidden_size=1024 \
   --moe_l2=1e-6 \
@@ -30,5 +31,7 @@ python inference.py \
   --moe_prob_gating=True \
   --run_once=True \
   --top_k=50 \
-  --batch_size=1024 \
-  --check_point=10
+  --batch_size=16 \
+  --check_point=169066 \
+  --output_model_tgz=True \
+  --train_dir=${train_dir}
