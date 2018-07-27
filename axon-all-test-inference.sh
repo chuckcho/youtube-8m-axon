@@ -7,7 +7,15 @@ data_path="/media/6TB/video/yt8m-v2/frame"
 #axon_test_set="${data_path}/test????.tfrecord"
 
 # or, try this for sanity check before running fully
-axon_test_set="${data_path}/test000?.tfrecord"
+#axon_test_set="${data_path}/test000?.tfrecord"
+
+# or, in otder to train a model for ensembling (optimum model weights)
+# we need inference on validate???5 data which we have labels for
+#axon_test_set="${data_path}/validate???5.tfrecord"
+
+# or for distillation
+axon_test_set="${data_path}/train????.tfrecord,${data_path}/validate???[012346789].tfrecord"
+output_prefix=inference-on-train-and-val0-4+6-9
 
 # be courteous, don't claim all GPU's! ;)
 export CUDA_VISIBLE_DEVICES=1
@@ -45,7 +53,7 @@ do
   model_name=${train_dir##*/}
 
   # consistent inference csv filename
-  output_file=${train_basedir}/test-${model_name}-cp${check_point}-top${top_k}.csv
+  output_file=${train_basedir}/${output_prefix}-${model_name}-cp${check_point}-top${top_k}.csv
 
   # grab additional model-specific input arguments
   option_args=$(cat ${train_dir}/option_arg.txt)
