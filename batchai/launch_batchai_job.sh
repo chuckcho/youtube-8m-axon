@@ -18,7 +18,6 @@ az configure --defaults location=$AZ_LOCATION
 az configure --defaults group=$AZ_RESOURCE_GROUP
 
 export CLUSTER_NAME=dus5uw2youtube8m-gpu
-export CLUSTER_USER=clusteradmin
 export WORKSPACE_NAME=Youtube8m
 export EXPERIMENT_NAME=exp_run_yt8m_inference_20180727161944
 export JOB_NAME=job_run_inference_${model_name}_$(date +"%Y%m%d%H%M%S")
