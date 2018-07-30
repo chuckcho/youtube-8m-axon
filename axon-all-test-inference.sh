@@ -31,9 +31,15 @@ export TF_CPP_MIN_LOG_LEVEL=3
 # inference_model.* files. If these files are not there, we'll symlinks from
 # check_point
 train_basedir=/media/6TB/video/yt8m-v2/__MODEL_VAULT__
+
+# may select only subset of model directories based on this shell-specific
+# filter (wildcard and bracket will work)
+#model_pattern="*"
+model_pattern="model??-01"
+
 top_k=50
 
-for train_dir in ${train_basedir}/*/
+for train_dir in ${train_basedir}/${model_pattern}/
 do
   echo -------------------------------------------------------------------------
   train_dir=${train_dir%/}
