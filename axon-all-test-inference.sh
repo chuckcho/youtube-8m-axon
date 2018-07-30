@@ -11,11 +11,15 @@ data_path="/media/6TB/video/yt8m-v2/frame"
 
 # or, in otder to train a model for ensembling (optimum model weights)
 # we need inference on validate???5 data which we have labels for
-#axon_test_set="${data_path}/validate???5.tfrecord"
+axon_test_set="${data_path}/validate0005.tfrecord"
+output_prefix=inference-on-validate0005-DELME
 
 # or for distillation
-axon_test_set="${data_path}/train????.tfrecord,${data_path}/validate???[012346789].tfrecord"
-output_prefix=inference-on-train-and-val0-4+6-9
+#axon_test_set="${data_path}/train????.tfrecord,${data_path}/validate???[012346789].tfrecord"
+#output_prefix=inference-on-train-and-val0-4+6-9
+
+# symlink checkpoint model to inference_model as if eval.py has been run
+export SYMLINK_INFERENCE=1
 
 # be courteous, don't claim all GPU's! ;)
 export CUDA_VISIBLE_DEVICES=1
@@ -64,38 +68,49 @@ do
     continue
   fi
 
-  # back up checkpoint file as it will be overwritten
-  cp -a ${train_dir}/checkpoint ${train_dir}/checkpoint.bak
+  if [ ${SYMLINK_INFERENCE} == "1" ]; then
+		if [ ! -f ${train_dir}/inference_model.meta ]; then
+			cd ${train_dir}
+			ln -s model.ckpt-${check_point}.meta                inference_model.meta
+			ln -s model.ckpt-${check_point}.index               inference_model.index
+			ln -s model.ckpt-${check_point}.data-00000-of-00001 inference_model.data-00000-of-00001
+			cd -
+		fi
 
-  # run eval.py just to get inference_model.* and strip all the hard-coded
-  # tfrecord file names
-  # TODO: this somehow fails on one of the GRU models. :( why why?
-  #       if inference_model.* files are symlinked (instead of created as
-  #       by-products of eval.py), inference.py runs fine.
-  echo ==============
-  echo Running
-  echo python eval.py \
-    --eval_data_pattern=${data_path}/validate0005.tfrecord \
-    --train_dir=${train_dir} \
-    ${option_args} \
-    --batch_size=128
-  echo ==============
+	else
+		# back up checkpoint file as it will be overwritten
+		cp -a ${train_dir}/checkpoint ${train_dir}/checkpoint.bak
 
-  python eval.py \
-    --eval_data_pattern=${data_path}/validate0005.tfrecord \
-    --train_dir=${train_dir} \
-    ${option_args} \
-    --batch_size=128
+		# run eval.py just to get inference_model.* and strip all the hard-coded
+		# tfrecord file names
+		# TODO: this somehow fails on one of the GRU models. :( why why?
+		#       if inference_model.* files are symlinked (instead of created as
+		#       by-products of eval.py), inference.py runs fine.
+		echo ==============
+		echo Running
+		echo python eval.py \
+			--eval_data_pattern=${data_path}/validate0005.tfrecord \
+			--train_dir=${train_dir} \
+			${option_args} \
+			--batch_size=128
+		echo ==============
 
-  # check if eval was run correctly
-  rc=$?
-  if [[ $rc != 0 ]]; then
-    echo eval.py did not run correctly. exit code=${rc}. exitting...
-    continue
-  fi
+		python eval.py \
+			--eval_data_pattern=${data_path}/validate0005.tfrecord \
+			--train_dir=${train_dir} \
+			${option_args} \
+			--batch_size=128
 
-  # revert the checkpoint file
-  cp -a ${train_dir}/checkpoint.bak ${train_dir}/checkpoint
+		# check if eval was run correctly
+		rc=$?
+		if [[ $rc != 0 ]]; then
+			echo eval.py did not run correctly. exit code=${rc}. exitting...
+			continue
+		fi
+
+		# revert the checkpoint file
+		cp -a ${train_dir}/checkpoint.bak ${train_dir}/checkpoint
+	fi
 
   # now run inference
   # TODO: inference using GPU
