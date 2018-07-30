@@ -18,20 +18,20 @@ axon_val_set="${data_path}/validate???5.tfrecord"
 # be courteous, don't claim all GPU's! ;)
 export CUDA_VISIBLE_DEVICES=3
 
-train_dir="distill-vlad-16-0p95"
+train_dir="distill-vlad-32-0p95"
 
 python inference.py \
   --output_file="${train_dir}.csv" \
   --input_data_pattern=${axon_val_set} \
   --netvlad_cluster_size=256 \
-  --netvlad_hidden_size=1024 \
+  --netvlad_hidden_size=800 \
   --moe_l2=1e-6 \
   --netvlad_relu=False \
   --gating=True \
   --moe_prob_gating=True \
   --run_once=True \
   --top_k=50 \
-  --batch_size=16 \
-  --check_point=169066 \
-  --output_model_tgz=True \
+  --batch_size=80 \
+  --check_point=274278 \
+  --output_model_tgz="tgz-${train_dir}.tgz" \
   --train_dir=${train_dir}

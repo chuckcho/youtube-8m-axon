@@ -171,49 +171,6 @@ def build_distillation_dict(input_csv_path):
   print("Added %d lines to dictionary" % line_count)
   return pred_dict, line_count, len(label_scores)
 
-'''
-Model Distillation: get_distillation_predictions()
-Get a tensor of distillation predictions given a dictionary
-
-Args:
-  pred_dict: python dictionary mapping videoIDs to prediction strings
-  batch_size: size of batch
-  num_classes: number of classes
-  top_k: how many predictions we have for each video (usually 20)
-
-Returns:
-  A TF tensor of size BatchSize x NumClasses
-'''
-def get_distillation_predictions(pred_dict, batch_size, num_classes, top_k):
-  init = KeyValueTensorInitializer(pred_dict.keys(), pred_dict.values())
-  hash_table = HashTable(init, default_value="")
-  data = tf.placeholder(tf.string, (None,), name='data')
-  values = hash_table.lookup(data)
-
-  labels_scores_tensor = tf.sparse_tensor_to_dense(tf.string_split(values, delimiter=' '), default_value="")
-
-  # Get the labels tensor and flatten it, so that it is num_classes * top_k long
-  labels_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64))
-  labels_tensor = tf.expand_dims(tf.reshape(labels_tensor, [-1]), -1)
-
-  # Create repeating sequence to index the rows of the predictions matrix
-  row_idx = tf_repeat(tf.range(batch_size, dtype=tf.int64), top_k)
-
-  # Concat labels tensor and row indices to form indices matrix
-  indices = tf.concat([labels_tensor, row_idx], axis=1)
-
-  # Get scores and reshape to be a long vector of updates
-  scores_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64))
-  updates = tf.reshape(scores_tensor, [-1])
-
-  shape = tf.constant([num_classes, batch_size], dtype=tf.int64)
-  distillation_predictions = tf.transpose(tf.scatter_nd(indices, updates, shape))
-  return distillation_predictions
-
-
-
-
-
 
 
 def validate_class_name(flag_value, category, modules, expected_superclass):
@@ -383,60 +340,54 @@ def build_graph(reader,
 
   set_temperature = tf.Variable(temperature) 
   if FLAGS.distillation_as_input:
+   
     with tf.device('/cpu:0'):
 
-      pred_dict, num_keys, _ = build_distillation_dict(FLAGS.distillation_input_path)
-      #num_keys = distillation_dict_size(FLAGS.distillation_input_path)
-      import numpy as np
-      print(FLAGS.distillation_input_path)
+      with tf.variable_scope("distill_hashtable"):
+        pred_dict, num_keys, _ = build_distillation_dict(FLAGS.distillation_input_path)
+        #num_keys = distillation_dict_size(FLAGS.distillation_input_path)
+        import numpy as np
+        print(FLAGS.distillation_input_path)
 
     				
-      place_tf_keys = tf.placeholder(tf.string, shape=np.array(pred_dict.keys()).shape, name='place_tf_keys')
-      place_tf_vals = tf.placeholder(tf.string, shape=np.array(pred_dict.values()).shape, name='place_tf_vals')
+        place_tf_keys = tf.placeholder(tf.string, shape=np.array(pred_dict.keys()).shape, name='place_tf_keys')
+        place_tf_vals = tf.placeholder(tf.string, shape=np.array(pred_dict.values()).shape, name='place_tf_vals')
 
-      set_keys = tf.Variable(place_tf_keys)
-      set_vals = tf.Variable(place_tf_vals) 
+        set_keys = tf.Variable(place_tf_keys)
+        set_vals = tf.Variable(place_tf_vals) 
 
-      #init = KeyValueTensorInitializer(pred_dict.keys(), pred_dict.values())
-      init = KeyValueTensorInitializer(set_keys, set_vals)
-      hash_table = HashTable(init, default_value=" ")
-      data = unused_video_id
-      print("data---->", data.get_shape())
-      values = hash_table.lookup(data)
+        #init = KeyValueTensorInitializer(pred_dict.keys(), pred_dict.values())
+        init = KeyValueTensorInitializer(set_keys, set_vals)
+        hash_table = HashTable(init, default_value=" ")
+        data = unused_video_id
+        values = hash_table.lookup(data)
 
-      labels_scores_tensor = tf.sparse_tensor_to_dense(tf.string_split(values, delimiter=' '), default_value="")
+   
+        labels_scores_tensor = tf.sparse_tensor_to_dense(tf.string_split(values, delimiter=' '), default_value="")
 
-      # Get the labels tensor and flatten it, so that it is num_classes * top_k long
-      #labels_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64))
-      labels_tensor = tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64)
-      labels_tensor = tf.expand_dims(tf.reshape(labels_tensor, [-1]), -1)
+        # Get the labels tensor and flatten it, so that it is num_classes * top_k long
+        labels_tensor = tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64)
+        labels_tensor = tf.expand_dims(tf.reshape(labels_tensor, [-1]), -1)
 
-      logging.info("label_tensor---->", labels_tensor.get_shape())
-      # Get scores and reshape to be a long vector of updates
-      #scores_tensor = tf.transpose(tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64))
-      #updates = tf.reshape(scores_tensor, [-1])
-      scores_tensor = tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64)
-      updates = tf.reshape(scores_tensor, [-1])
+        # Get scores and reshape to be a long vector of updates
+        scores_tensor = tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64)
+        updates = tf.reshape(scores_tensor, [-1])
 
 
-      print("score_tensor---->update", scores_tensor.get_shape(), updates.get_shape())
-      # Create repeating sequence to index the rows of the predictions matrix
-      #top_k = tf.shape(scores_tensor)[0]
-      top_k = tf.shape(scores_tensor)[1]
-      #seq = tf.range(batch_size, dtype=tf.int64)
-      #row_idx = tf.expand_dims(tf.reshape(tf.tile(tf.reshape(seq, (-1, 1)), (1, top_k))), -1)
-      row_idx = tf_repeat(tf.range(batch_size, dtype=tf.int64), top_k)
+        # Create repeating sequence to index the rows of the predictions matrix
+        #top_k = tf.shape(scores_tensor)[0]
+        top_k = tf.shape(scores_tensor)[1]
+        #seq = tf.range(batch_size, dtype=tf.int64)
+        #row_idx = tf.expand_dims(tf.reshape(tf.tile(tf.reshape(seq, (-1, 1)), (1, top_k))), -1)
+        row_idx = tf_repeat(tf.range(batch_size, dtype=tf.int64), top_k)
       
-      print("row_idx---->", row_idx.get_shape())
-      # Concat labels tensor and row indices to form indices matrix
-      indices = tf.concat([labels_tensor, row_idx], axis=1)
+        # Concat labels tensor and row indices to form indices matrix
+        indices = tf.concat([labels_tensor, row_idx], axis=1)
 
-      print("indices---->", indices.get_shape())
-      shape = tf.constant([num_classes, batch_size], dtype=tf.int64)
-      distillation_predictions = tf.transpose(tf.scatter_nd(indices, updates, shape))
-      print("dist pred shape---->", distillation_predictions.get_shape())
-      tmp_distill_pred = tf.pow(distillation_predictions, 1 / set_temperature)
-      distillation_predictions = tmp_distill_pred / tf.tile(tf.expand_dims(tf.reduce_sum(tmp_distill_pred, axis=1), -1), (1, num_classes))
+        shape = tf.constant([num_classes, batch_size], dtype=tf.int64)
+        distillation_predictions = tf.transpose(tf.scatter_nd(indices, updates, shape))
+        #tmp_distill_pred = tf.pow(distillation_predictions, 1 / set_temperature)
+        #distillation_predictions = tmp_distill_pred / tf.tile(tf.expand_dims(tf.reduce_sum(tmp_distill_pred, axis=1), -1), (1, num_classes))
 
 
 
@@ -466,8 +417,8 @@ def build_graph(reader,
             tf.summary.histogram(variable.op.name, variable)
 
           predictions = result["predictions"]
-          tmp_pred = tf.pow(predictions, tf.cast(1 / set_temperature, tf.float32))
-          predictions = tmp_pred / tf.tile(tf.expand_dims(tf.reduce_sum(tmp_pred, axis=1), -1), (1, num_classes))
+          #tmp_pred = tf.pow(predictions, tf.cast(1 / set_temperature, tf.float32))
+          #predictions = tmp_pred / tf.tile(tf.expand_dims(tf.reduce_sum(tmp_pred, axis=1), -1), (1, num_classes))
 
           tower_predictions.append(predictions)
 
@@ -643,8 +594,10 @@ class Trainer(object):
           row_idx = tf.get_collection("row_idx")
       
           pred_dict, num_keys, len_vals = build_distillation_dict(FLAGS.distillation_input_path)
-          place_tf_keys = tf.get_default_graph().get_tensor_by_name("place_tf_keys:0")
-          place_tf_vals = tf.get_default_graph().get_tensor_by_name("place_tf_vals:0")
+          #place_tf_keys = tf.get_default_graph().get_tensor_by_name("place_tf_keys:0")
+          #place_tf_vals = tf.get_default_graph().get_tensor_by_name("place_tf_vals:0")
+          place_tf_keys = tf.get_default_graph().get_tensor_by_name("distill_hashtable/place_tf_keys:0")
+          place_tf_vals = tf.get_default_graph().get_tensor_by_name("distill_hashtable/place_tf_vals:0")
         
         unused_video_id = tf.get_collection("unused_video_id")
         
@@ -653,7 +606,7 @@ class Trainer(object):
 
 
     if FLAGS.distillation_as_input:
-      init_distill_dict = { place_tf_keys:pred_dict.keys(), place_tf_vals: pred_dict.values(), temperature: [2.0] }
+      init_distill_dict = { place_tf_keys:pred_dict.keys(), place_tf_vals: pred_dict.values(), temperature: [1.0] }
     else:
       init_distill_dict = { temperature: [1.0] }
 
