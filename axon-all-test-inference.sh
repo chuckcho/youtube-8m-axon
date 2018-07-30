@@ -4,6 +4,7 @@
 get_gpu_id () {
   NUM_GPUS=$(nvidia-smi -L | egrep "^GPU [0-9]"|wc -l)
   GPUS_BEING_USED=$(nvidia-smi | egrep -A 10 'Process name' | egrep -v "(==|\-\-|GPU)" | awk '{print $2}' | uniq)
+
   # make it zero-based
   let NUM_GPUS--
 
@@ -74,7 +75,7 @@ do
     continue
   fi
 
-  # check if optino_arg file is there
+  # check if option_arg file is there
   if [ ! -f ${train_dir}/option_arg.txt ]; then
     echo option argument file inside ${train_dir} does not exist. skipping...
     continue
@@ -99,48 +100,48 @@ do
   fi
 
   if [ ${SYMLINK_INFERENCE} == "1" ]; then
-		if [ ! -f ${train_dir}/inference_model.meta ]; then
-			cd ${train_dir}
-			ln -s model.ckpt-${check_point}.meta                inference_model.meta
-			ln -s model.ckpt-${check_point}.index               inference_model.index
-			ln -s model.ckpt-${check_point}.data-00000-of-00001 inference_model.data-00000-of-00001
-			cd -
-		fi
+    if [ ! -f ${train_dir}/inference_model.meta ]; then
+      cd ${train_dir}
+      ln -s model.ckpt-${check_point}.meta                inference_model.meta
+      ln -s model.ckpt-${check_point}.index               inference_model.index
+      ln -s model.ckpt-${check_point}.data-00000-of-00001 inference_model.data-00000-of-00001
+      cd -
+    fi
 
-	else
-		# back up checkpoint file as it will be overwritten
-		cp -a ${train_dir}/checkpoint ${train_dir}/checkpoint.bak
+  else
+    # back up checkpoint file as it will be overwritten
+    cp -a ${train_dir}/checkpoint ${train_dir}/checkpoint.bak
 
-		# run eval.py just to get inference_model.* and strip all the hard-coded
-		# tfrecord file names
-		# TODO: this somehow fails on one of the GRU models. :( why why?
-		#       if inference_model.* files are symlinked (instead of created as
-		#       by-products of eval.py), inference.py runs fine.
-		echo ==============
-		echo Running
-		echo python eval.py \
-			--eval_data_pattern=${data_path}/validate0005.tfrecord \
-			--train_dir=${train_dir} \
-			${option_args} \
-			--batch_size=128
-		echo ==============
+    # run eval.py just to get inference_model.* and strip all the hard-coded
+    # tfrecord file names
+    # TODO: this somehow fails on one of the GRU models. :( why why?
+    #       if inference_model.* files are symlinked (instead of created as
+    #       by-products of eval.py), inference.py runs fine.
+    echo ==============
+    echo Running
+    echo python eval.py \
+      --eval_data_pattern=${data_path}/validate0005.tfrecord \
+      --train_dir=${train_dir} \
+      ${option_args} \
+      --batch_size=128
+    echo ==============
 
-		python eval.py \
-			--eval_data_pattern=${data_path}/validate0005.tfrecord \
-			--train_dir=${train_dir} \
-			${option_args} \
-			--batch_size=128
+    python eval.py \
+      --eval_data_pattern=${data_path}/validate0005.tfrecord \
+      --train_dir=${train_dir} \
+      ${option_args} \
+      --batch_size=128
 
-		# check if eval was run correctly
-		rc=$?
-		if [[ $rc != 0 ]]; then
-			echo eval.py did not run correctly. exit code=${rc}. exitting...
-			continue
-		fi
+    # check if eval was run correctly
+    rc=$?
+    if [[ $rc != 0 ]]; then
+      echo eval.py did not run correctly. exit code=${rc}. exitting...
+      continue
+    fi
 
-		# revert the checkpoint file
-		cp -a ${train_dir}/checkpoint.bak ${train_dir}/checkpoint
-	fi
+    # revert the checkpoint file
+    cp -a ${train_dir}/checkpoint.bak ${train_dir}/checkpoint
+  fi
 
   # now run inference
   # TODO: inference using GPU
