@@ -125,6 +125,9 @@ do
     --batch_size=512
   echo ==============
 
+  # temporarily create output_file as a simple "lock" mechnism (so that multiple
+  # instances of this script can run)
+  touch ${output_file}
   python inference.py \
     --output_file=${output_file} \
     --input_data_pattern=${axon_test_set} \
@@ -136,6 +139,8 @@ do
   # check if inference was run correctly
   rc=$?
   if [[ $rc != 0 ]]; then
+    # delete temporary "lock" file
+    rm -f ${output_file}
     echo inference.py did not run correctly. exit code=${rc}. exitting...
     echo most likely the model was trained with https://github.com/antoine77340/Youtube-8M-WILLOW and not with https://git.taservs.net/axon-research/youtube-8m
     continue
