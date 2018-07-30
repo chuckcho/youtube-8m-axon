@@ -11,6 +11,8 @@
 
 # data_path should be good for ALL seattle GPU boxes
 data_path="/media/6TB/video/yt8m-v2/frame"
+# data_path for batch ai cluster
+#data_path="/mnt/batch/tasks/shared/LS_root/mounts/youtube8m/frame"
 
 # use ALL test examples
 axon_test_set="${data_path}/test????.tfrecord"
@@ -21,12 +23,13 @@ export CUDA_VISIBLE_DEVICES=3
 # inference.py assumes eval.py has been already run, and created
 # inference_model.* files. If these files are not there, we'll symlinks from
 # check_point
-train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe
-check_point=380325
+root_dir=/mnt/batch/tasks/shared/LS_root/mounts/youtube8m/misc
+train_dir=$1
+check_point=$2
 top_k=50
 
-if [ ! -f ${train_dir}/inference_model.meta ]; then
-  cd ${train_dir}
+if [ ! -f ${root_dir}/${train_dir}/inference_model.meta ]; then
+  cd ${root_dir}/${train_dir}
   ln -s model.ckpt-${check_point}.meta                inference_model.meta
   ln -s model.ckpt-${check_point}.index               inference_model.index
   ln -s model.ckpt-${check_point}.data-00000-of-00001 inference_model.data-00000-of-00001
@@ -34,9 +37,9 @@ if [ ! -f ${train_dir}/inference_model.meta ]; then
 fi
 
 python inference.py \
-  --output_file=test-${train_dir}-cp${check_point}-top${top_k}.csv \
+  --output_file=${root_dir}/test-${train_dir}-cp${check_point}-top${top_k}.csv \
   --input_data_pattern=${axon_test_set} \
-  --train_dir=${train_dir} \
+  --train_dir=${root_dir}/${train_dir} \
   --netvlad_cluster_size=256 \
   --netvlad_hidden_size=1024 \
   --netvlad_relu=False \
