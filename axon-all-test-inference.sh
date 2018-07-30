@@ -1,5 +1,29 @@
 #!/usr/bin/env bash
 
+# basic hacky way to grab GPU ID that's idle
+get_gpu_id () {
+  NUM_GPUS=$(nvidia-smi -L | egrep "^GPU [0-9]"|wc -l)
+  GPUS_BEING_USED=$(nvidia-smi | egrep -A 10 'Process name' | egrep -v "(==|\-\-|GPU)" | awk '{print $2}' | uniq)
+  # make it zero-based
+  let NUM_GPUS--
+
+  GOOD_GPU=""
+  for i in $(seq 0 ${NUM_GPUS}); do
+    if [[ ! ${GPUS_BEING_USED} =~ $i ]]; then
+      GOOD_GPU=$i
+      break
+    fi
+  done
+
+  if [[ -z ${GOOD_GPU} ]]; then
+    echo Looks like there is no GPU available. Exitting...
+    exit -10
+  fi
+}
+
+# get an available GPU
+get_gpu_id
+
 # data_path should be good for ALL seattle GPU boxes
 data_path="/media/6TB/video/yt8m-v2/frame"
 
@@ -11,18 +35,18 @@ data_path="/media/6TB/video/yt8m-v2/frame"
 
 # or, in otder to train a model for ensembling (optimum model weights)
 # we need inference on validate???5 data which we have labels for
-axon_test_set="${data_path}/validate0005.tfrecord"
-output_prefix=inference-on-validate0005-DELME
+#axon_test_set="${data_path}/validate0005.tfrecord"
+#output_prefix=inference-on-validate0005-DELME
 
 # or for distillation
-#axon_test_set="${data_path}/train????.tfrecord,${data_path}/validate???[012346789].tfrecord"
-#output_prefix=inference-on-train-and-val0-4+6-9
+axon_test_set="${data_path}/train????.tfrecord,${data_path}/validate???[012346789].tfrecord"
+output_prefix=inference-on-train-and-val0-4+6-9
 
 # symlink checkpoint model to inference_model as if eval.py has been run
 export SYMLINK_INFERENCE=1
 
 # be courteous, don't claim all GPU's! ;)
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=${GOOD_GPU}
 
 # less verbose?
 export TF_CPP_MIN_LOG_LEVEL=3
