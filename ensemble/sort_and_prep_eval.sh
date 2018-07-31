@@ -17,5 +17,5 @@ for i in ${unprocessed_inference}; do
     continue
   fi
 
-  cat $i | tail -n+2 | sort -k1 -t, > $o
+  cat $i | tail -n+2 | sort -k1,1 -t, > $o
 done
