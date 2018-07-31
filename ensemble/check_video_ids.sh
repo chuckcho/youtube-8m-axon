@@ -12,21 +12,24 @@ if [[ ${file_count} -le 1 ]]; then
 fi
 
 processed_inference=$(ls -1 ${inference_dir}/*.csv | egrep ${post_fix})
-#num_lines=""
-#for i in ${processed_inference}; do
-#  echo Checking $i...
-#  num_lines_this_file=$(wc -l < $i)
-#  if [[ -z ${num_lines} ]]; then
-#    num_lines=${num_lines_this_file}
-#    continue
-#  else
-#    if [[ ${num_lines} != ${num_lines_this_file} ]]; then
-#      echo Number of lines differ. This file has ${num_lines_this_file} lines, but previous one\(s\) had ${num_lines}. Panic\!
-#      exit -2
-#    fi
-#  fi
-#done
 
+# first pass: check number of lines
+num_lines=""
+for i in ${processed_inference}; do
+  echo Checking $i...
+  num_lines_this_file=$(wc -l < $i)
+  if [[ -z ${num_lines} ]]; then
+    num_lines=${num_lines_this_file}
+    continue
+  else
+    if [[ ${num_lines} != ${num_lines_this_file} ]]; then
+      echo Number of lines differ. This file has ${num_lines_this_file} lines, but previous one\(s\) had ${num_lines}. Panic\!
+      exit -2
+    fi
+  fi
+done
+
+# second pass: check if video ID's match up
 echo Number of lines all agree. Now checking if video ID\'s all match up.
 out=/tmp/video-ids.txt
 rm -f ${out}

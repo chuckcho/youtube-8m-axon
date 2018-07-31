@@ -13,7 +13,7 @@ for i in ${unprocessed_inference}; do
   o=${inference_dir}/${filename}-${post_fix}.csv
 
   if [[ -f $o ]]; then
-    echo Output file=$o already exist. Skipping...
+    echo Output file=$o already exists. Skipping...
     continue
   fi
 

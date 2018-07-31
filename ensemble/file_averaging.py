@@ -41,7 +41,7 @@ def do_stuff(model_pred, output_file, total_weight=None):
     if line_count % show_progress_iter == 0:
       elapsed = (time.time() - start_time)
       throughput = float(line_count+1) / elapsed
-      eta = elapsed * total_num_vids / (line_count+1) / 60.0
+      eta = elapsed * (float(total_num_vids) / (line_count+1) - 1) / 60.0
       print("[Info] Progress={:2.1f}% ({}/{}), Throughput={:.1f} lines/s, ETA={:.1f} min".format(
               float(line_count+1) / total_num_vids * 100,
               line_count+1,
