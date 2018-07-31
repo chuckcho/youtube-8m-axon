@@ -6,8 +6,12 @@ import subprocess
 import sys
 import time
 
-inference_dir = '/media/TB2/chuck/__MODEL_VAULT__'
-#inference_dir = '/tmp/__MODEL_VAULT__'
+if os.environ.get('INFDIR'):
+  inference_dir = os.environ['INFDIR']
+else:
+  #inference_dir = '/tmp/__MODEL_VAULT__'
+  inference_dir = '/media/TB2/chuck/__MODEL_VAULT__'
+
 significant_digits = 6
 top_k = 50
 show_progress_iter = 20000
