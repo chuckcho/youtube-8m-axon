@@ -3,7 +3,7 @@
 # check if all video_ids match (after sorting)
 
 # if env var is set, use it. otherwise specify here manually.
-if [[ -z "${INFDIR}" ]]; then
+if [[ ! -z "${INFDIR}" ]]; then
   inference_dir=${INFDIR}
 else
   inference_dir=/media/TB2/chuck/__MODEL_VAULT__
