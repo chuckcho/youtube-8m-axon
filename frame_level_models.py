@@ -107,6 +107,14 @@ flags.DEFINE_bool("lstm_backward", False, "BW reading for LSTM")
 
 flags.DEFINE_bool("fc_dimred", True, "Adding FC dimred after pooling")
 
+
+def ssr_normalize(x, norm_type):
+  if norm_type == 'L2':
+    return tf.nn.l2_normalize(x, 1)
+  else:
+    return tf.multiply(tf.sign(x), tf.sqrt(tf.abs(x)))
+
+
 class FrameLevelLogisticModel(models.BaseModel):
 
   def create_model(self, model_input, vocab_size, num_frames, **unused_params):
@@ -241,10 +249,13 @@ class NetVLAD():
         vlad = tf.transpose(vlad,perm=[0,2,1])
         vlad = tf.subtract(vlad,a)
 
-        vlad = tf.nn.l2_normalize(vlad,1)
+        #vlad = tf.nn.l2_normalize(vlad,1)
+        
+        vlad = tf.nn.l2_normalize(vlad, 0)
 
         vlad = tf.reshape(vlad,[-1,self.cluster_size*self.feature_size])
         vlad = tf.nn.l2_normalize(vlad,1)
+        #vlad = ssr_normalize(vlad, ' ')
 
         return vlad
 

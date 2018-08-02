@@ -130,13 +130,13 @@ def tf_repeat(seq, ntimes):
 
   #return tf.expand_dims(tf.reshape(tf.tile(tf.reshape(seq, (-1, 1)), (1, ntimes))), -1)
 
-
+'''
 def distillation_dict_size(input_csv_path):
   pred_dict = {}
   line_count = 0
   try:
     fid = open(input_csv_path, 'r')
-    next(fid)
+    #next(fid)
     for line in fid:
         line_count = line_count + 1
   except IOError:
@@ -144,7 +144,7 @@ def distillation_dict_size(input_csv_path):
 
   print("Added %d lines to dictionary" % line_count)
   return line_count
-
+'''
 
 
 
@@ -159,7 +159,7 @@ def build_distillation_dict(input_csv_path):
   line_count = 0
   try:
     fid = open(input_csv_path, 'r')
-    next(fid)
+    #next(fid)
     for line in fid:
         line_count = line_count + 1
         vid, label_scores = line.split(',')
@@ -330,8 +330,8 @@ def build_graph(reader,
 
   feature_dim = len(model_input_raw.get_shape()) - 1
   model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
-################### ----> need to define distill_labels_batch
-  logging.info("----------------- beginning--------")
+  
+  logging.info("----------------- beginning of hashtable for distillation--------")
   # Build lookup table of distillation predictions
 
   num_classes = reader.num_classes
@@ -362,15 +362,16 @@ def build_graph(reader,
         data = unused_video_id
         values = hash_table.lookup(data)
 
-   
         labels_scores_tensor = tf.sparse_tensor_to_dense(tf.string_split(values, delimiter=' '), default_value="")
-
+        
         # Get the labels tensor and flatten it, so that it is num_classes * top_k long
         labels_tensor = tf.string_to_number(labels_scores_tensor[:,::2], out_type=tf.int64)
+        #labels_tensor = tf.cast(tf.ones([batch_size, 50]), tf.int64)
         labels_tensor = tf.expand_dims(tf.reshape(labels_tensor, [-1]), -1)
 
         # Get scores and reshape to be a long vector of updates
         scores_tensor = tf.string_to_number(labels_scores_tensor[:,1::2], out_type=tf.float64)
+        #scores_tensor = tf.cast(tf.ones([batch_size, 50]), tf.float64)
         updates = tf.reshape(scores_tensor, [-1])
 
 
@@ -496,6 +497,10 @@ def build_graph(reader,
     tf.add_to_collection("labels_tensor", labels_tensor)
     tf.add_to_collection("distillation_predictions", tf.concat(tower_distill_preds, 0))
     tf.add_to_collection("row_idx", row_idx)
+    tf.add_to_collection("data", data)
+    tf.add_to_collection("values", values)
+    tf.add_to_collection("labels_scores_tensor", labels_scores_tensor)
+
   tf.add_to_collection("unused_video_id", unused_video_id)
 
 class Trainer(object):
@@ -592,6 +597,9 @@ class Trainer(object):
           labels_tensor = tf.get_collection("labels_tensor")[0]
           distillation_predictions = tf.get_collection("distillation_predictions")[0]
           row_idx = tf.get_collection("row_idx")
+          data = tf.get_collection("data")
+          values = tf.get_collection("values")
+          labels_scores_tensor = tf.get_collection("labels_scores_tensor")
       
           pred_dict, num_keys, len_vals = build_distillation_dict(FLAGS.distillation_input_path)
           #place_tf_keys = tf.get_default_graph().get_tensor_by_name("place_tf_keys:0")
@@ -630,11 +638,12 @@ class Trainer(object):
         logging.info("%s: Entering training loop.", task_as_string(self.task))
         while (not sv.should_stop()) and (not self.max_steps_reached):
           batch_start_time = time.time()
+          #try:
           _, global_step_val, loss_val, predictions_val, labels_val = sess.run(
-              [train_op, global_step, loss, predictions, labels])
+                [train_op, global_step, loss, predictions, labels])
           seconds_per_batch = time.time() - batch_start_time
           examples_per_second = labels_val.shape[0] / seconds_per_batch
-          
+          #except:
           ''' 
           print('vid', unused_video_id_val[0])
  
@@ -701,7 +710,25 @@ class Trainer(object):
           else:
             logging.info("training step " + str(global_step_val) + " | Loss: " +
               ("%.2f" % loss_val) + " Examples/sec: " + ("%.2f" % examples_per_second))
-      except tf.errors.OutOfRangeError:
+      except: #tf.errors.OutOfRangeError:
+        print('----> training broke')
+        import numpy as np
+        data_val, values_val, labels_scores_tensor_val = sess.run([data, values, labels_scores_tensor])
+        lc = list(np.squeeze(labels_scores_tensor_val))
+        vid = np.array(data_val).reshape([-1])
+        
+        np.savetxt("./train_breakpoint_lc.txt", lc, delimiter=",", newline = "\n", fmt="%s")
+        np.savetxt('./train_breakpoint_data.txt', list(data_val), delimiter=",", newline="\n", fmt="%s")
+        np.savetxt('./train_breakpoint_values.txt', list(values_val), delimiter=",", newline="\n", fmt="%s")
+       
+        #for ii, el in enumerate(np.squeeze(np.array(labels_scores_tensor_val), axis=0)):
+        #  if any([e=='' for e in el]):
+        #    print("vid, labels -----", vid[ii], el)
+
+
+
+
+        import sys; sys.exit()
         logging.info("%s: Done training -- epoch limit reached.",
                      task_as_string(self.task))
 

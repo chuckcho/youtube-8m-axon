@@ -14,7 +14,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 python train.py \
   --num_gpu=1 \
   --train_data_pattern="${axon_train_set}" \
-  --train_dir=distill-vlad-32-1p0 \
+  --train_dir=distill-vlad-32-1p0-ssr-ensemble \
   --model=NetVLADModelLF \
   --frame_features=True \
   --feature_names="rgb,audio" \
@@ -32,7 +32,7 @@ python train.py \
   --batch_size=32 \
   --distillation_as_input=True \
   --distillation_percent=1.0 \
-  --distillation_input_path=baseline-pduan-train_plus_validate-cp_274278.csv
+  --distillation_input_path=inference-on-train-and-val0-4+6-9-ensemble-14models-ljames-weighted-top50-noheader.csv
   
 #--lightvlad=True
   
