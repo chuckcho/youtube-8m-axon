@@ -32,6 +32,20 @@ from tensorflow import logging
 from tensorflow.python.client import device_lib
 import utils
 import numpy as np
+import cmath
+
+
+# for solving the 'Tensor' object has no attribute 'initializer' issue when importing metagraph
+from tensorflow.core.framework import variable_pb2
+from tensorflow.python.framework import ops
+from tensorflow.python.ops import variables
+from tensorflow.python.framework.ops import register_proto_function
+
+#register_proto_function(
+#        ops.GraphKeys.LOCAL_VARIABLES,
+#        proto_type=variable_pb2.VariableDef,
+#        to_proto=variables.Variable.to_proto,
+#        from_proto=variables.Variable.from_proto)
 
 FLAGS = flags.FLAGS
 
@@ -221,7 +235,7 @@ def build_graph(reader,
   """
 
   global_step = tf.Variable(0, trainable=False, name="global_step")
-
+  
   local_device_protos = device_lib.list_local_devices()
   gpus = [x.name for x in local_device_protos if x.device_type == 'GPU']
   gpus = gpus[:FLAGS.num_gpu]
@@ -328,6 +342,7 @@ def build_graph(reader,
       merged_gradients = utils.clip_gradient_norms(merged_gradients, clip_gradient_norm)
 
   train_op = optimizer.apply_gradients(merged_gradients, global_step=global_step)
+  merged_summary_op = tf.summary.merge_all()
 
   tf.add_to_collection("global_step", global_step)
   tf.add_to_collection("loss", label_loss)
@@ -337,6 +352,7 @@ def build_graph(reader,
   tf.add_to_collection("num_frames", num_frames)
   tf.add_to_collection("labels", tf.cast(labels_batch, tf.float32))
   tf.add_to_collection("train_op", train_op)
+  tf.add_to_collection("summary_op", merged_summary_op)
 
 
 class Trainer(object):
@@ -416,85 +432,109 @@ class Trainer(object):
 
       with tf.device(device_fn):
         if not meta_filename:
-          saver = self.build_model(self.model, self.reader)
+         saver = self.build_model(self.model, self.reader)
 
         global_step = tf.get_collection("global_step")[0]
         loss = tf.get_collection("loss")[0]
         predictions = tf.get_collection("predictions")[0]
         labels = tf.get_collection("labels")[0]
         train_op = tf.get_collection("train_op")[0]
-        init_op = tf.global_variables_initializer()
+        summary_op = tf.get_collection("summary_op")[0]
 
-    self.correlationMat = np.identity(7724, dtype=np.float32)
-    sv = tf.train.Supervisor(
-        graph,
-        logdir=self.train_dir,
-        init_op=init_op,
-        is_chief=self.is_master,
-        global_step=global_step,
-        save_model_secs=15 * 60,
-        save_summaries_secs=120,
-        saver=saver)
+      correlationMat = np.identity(3862, dtype=np.float32)
+      expert_weights = graph.get_tensor_by_name('tower/weight_sum:0')
+      #sv = tf.train.Supervisor(
+      #    graph,
+      #    logdir=self.train_dir,
+      #    init_op=init_op,
+      #    is_chief=self.is_master,
+      #    global_step=global_step,
+      #    save_model_secs=15 * 60,
+      #    save_summaries_secs=120,
+      #    saver=saver)
 
-#    px = graph.get_tensor_by_name('tower/correlationMat:0')
-    logging.info("%s: Starting managed session.", task_as_string(self.task))
-    with sv.managed_session(target, config=self.config) as sess:
-      try:
-        logging.info("%s: Entering training loop.", task_as_string(self.task))
-        return
-        while (not sv.should_stop()) and (not self.max_steps_reached):
-          batch_start_time = time.time()
-          _, global_step_val, loss_val, predictions_val, labels_val = sess.run(
-                  [train_op, global_step, loss, predictions, labels]) #{px: self.correlationMat})
-          seconds_per_batch = time.time() - batch_start_time
-          examples_per_second = labels_val.shape[0] / seconds_per_batch
+      summary_writer = tf.summary.FileWriter(self.train_dir + '/logs', graph=graph)
+      coord = tf.train.Coordinator()
+      px = graph.get_tensor_by_name('tower/correlationMat:0')
+      logging.info("%s: Starting session.", task_as_string(self.task))
+      #with sv.managed_session(target, config=self.config) as sess:
+    
+      with tf.Session(config=self.config) as sess:
+        sess.run([tf.global_variables_initializer(), tf.local_variables_initializer()])
+        ckpt = tf.train.get_checkpoint_state(self.train_dir)
+        if ckpt and ckpt.model_checkpoint_path:
+            tf.logging.info('Restoring variables from: %s', ckpt.model_checkpoint_path)
+            saver.restore(sess, ckpt.all_model_checkpoint_paths[-1])
 
-          if self.max_steps and self.max_steps <= global_step_val:
-            self.max_steps_reached = True
+        threads = tf.train.queue_runner.start_queue_runners(sess=sess, coord=coord)
+        try:
+          logging.info("%s: Entering training loop.", task_as_string(self.task))
+          while not coord.should_stop() and not self.max_steps_reached:
+            batch_start_time = time.time()
+            _, global_step_val, loss_val, predictions_val, labels_val, expertMat, summaries = sess.run(
+                    [train_op, global_step, loss, predictions, labels, expert_weights, summary_op], {px: correlationMat})
+            seconds_per_batch = time.time() - batch_start_time
+            examples_per_second = labels_val.shape[0] / seconds_per_batch
+             
+            if self.max_steps and self.max_steps <= global_step_val:
+              self.max_steps_reached = True
 
-          if self.is_master and global_step_val % 10 == 0 and self.train_dir:
-            eval_start_time = time.time()
-            hit_at_one = eval_util.calculate_hit_at_one(predictions_val, labels_val)
-            perr = eval_util.calculate_precision_at_equal_recall_rate(predictions_val,
-                                                                      labels_val)
-            gap = eval_util.calculate_gap(predictions_val, labels_val)
-            eval_end_time = time.time()
-            eval_time = eval_end_time - eval_start_time
+            if self.is_master and global_step_val % 10 == 0 and self.train_dir:
+              # update correlationMat
+              # print 'expertMat', expertMat
+              start = time.time()
+              matSqrt = sqrtMat(np.matmul(np.transpose(expertMat), expertMat))
+              correlationMat = matSqrt / np.trace(matSqrt)
+              print 'updated correlationMat time', time.time() - start
+              
+              eval_start_time = time.time()
+              hit_at_one = eval_util.calculate_hit_at_one(predictions_val, labels_val)
+              perr = eval_util.calculate_precision_at_equal_recall_rate(predictions_val,
+                                                                        labels_val)
+              gap = eval_util.calculate_gap(predictions_val, labels_val)
+              eval_end_time = time.time()
+              eval_time = eval_end_time - eval_start_time
 
-            logging.info("training step " + str(global_step_val) + " | Loss: " + ("%.2f" % loss_val) +
-              " Examples/sec: " + ("%.2f" % examples_per_second) + " | Hit@1: " +
-              ("%.2f" % hit_at_one) + " PERR: " + ("%.2f" % perr) +
-              " GAP: " + ("%.2f" % gap))
+              logging.info("training step " + str(global_step_val) + " | Loss: " + ("%.2f" % loss_val) +
+                " Examples/sec: " + ("%.2f" % examples_per_second) + " | Hit@1: " +
+                ("%.2f" % hit_at_one) + " PERR: " + ("%.2f" % perr) +
+                " GAP: " + ("%.2f" % gap))
 
-            sv.summary_writer.add_summary(
-                utils.MakeSummary("model/Training_Hit@1", hit_at_one),
-                global_step_val)
-            sv.summary_writer.add_summary(
-                utils.MakeSummary("model/Training_Perr", perr), global_step_val)
-            sv.summary_writer.add_summary(
-                utils.MakeSummary("model/Training_GAP", gap), global_step_val)
-            sv.summary_writer.add_summary(
-                utils.MakeSummary("global_step/Examples/Second",
-                                  examples_per_second), global_step_val)
-            sv.summary_writer.flush()
+              summary_writer.add_summary(summaries, global_step_val)
 
-            # Exporting the model every x steps
-            time_to_export = ((self.last_model_export_step == 0) or
-                (global_step_val - self.last_model_export_step
-                 >= self.export_model_steps))
+              summary_writer.add_summary(
+                  utils.MakeSummary("model/Training_Hit@1", hit_at_one),
+                  global_step_val)
+              summary_writer.add_summary(
+                  utils.MakeSummary("model/Training_Perr", perr), global_step_val)
+              summary_writer.add_summary(
+                  utils.MakeSummary("model/Training_GAP", gap), global_step_val)
+              summary_writer.add_summary(
+                  utils.MakeSummary("global_step/Examples/Second",
+                                    examples_per_second), global_step_val)
+              summary_writer.flush()
 
-            if self.is_master and time_to_export:
-              self.export_model(global_step_val, sv.saver, sv.save_path, sess)
-              self.last_model_export_step = global_step_val
-          else:
-            logging.info("training step " + str(global_step_val) + " | Loss: " +
-              ("%.2f" % loss_val) + " Examples/sec: " + ("%.2f" % examples_per_second))
-      except tf.errors.OutOfRangeError:
-        logging.info("%s: Done training -- epoch limit reached.",
-                     task_as_string(self.task))
+              # Exporting the model every x steps
+              time_to_export = ((self.last_model_export_step == 0) or
+                  (global_step_val - self.last_model_export_step
+                   >= self.export_model_steps))
 
-    logging.info("%s: Exited training loop.", task_as_string(self.task))
-    sv.Stop()
+              if self.is_master and time_to_export:
+                save_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
+                self.export_model(global_step_val, saver, save_path, sess)
+                self.last_model_export_step = global_step_val
+                # store correlationMat
+                np.save('correlationMat', correlationMat)
+            else:
+              logging.info("training step " + str(global_step_val) + " | Loss: " +
+                ("%.2f" % loss_val) + " Examples/sec: " + ("%.2f" % examples_per_second))
+        except tf.errors.OutOfRangeError:
+          logging.info("%s: Done training -- epoch limit reached.",
+                       task_as_string(self.task))
+
+      logging.info("%s: Exited training loop.", task_as_string(self.task))
+      coord.request_stop()
+      coord.join(threads)
 
   def export_model(self, global_step_val, saver, save_path, session):
 
@@ -655,6 +695,11 @@ def start_server(cluster, task):
 
 def task_as_string(task):
   return "/job:%s/task:%s" % (task.type, task.index)
+
+def sqrtMat(mat): # mat has to be symmetric
+  D, V = np.linalg.eigh(mat)
+  return np.matmul(np.matmul(V, np.diag(map(cmath.sqrt, D))), V.T)
+  #return np.matmul(np.matmul(V, np.diag(np.sqrt(D))), V.T)
 
 def main(unused_argv):
   # Load the environment.

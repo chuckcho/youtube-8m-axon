@@ -129,12 +129,17 @@ class MoeModel(models.BaseModel):
         scope="experts")
 
     with tf.variable_scope('experts', reuse=True):
-    	expert_weights = tf.get_variable('weights')
+        expert_weights = tf.get_variable('weights')
 
-    weight_size = vocab_size * num_mixtures
-    #self.correlationMat = tf.placeholder(tf.float32, [weight_size, weight_size], name="correlationMat")
-    #regularizer = tf.trace(tf.matmul(tf.matmul(expert_weights, tf.matrix_inverse(self.correlationMat)), tf.transpose(expert_weights)))
-    #tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, regularizer)
+    weight_sum = tf.reshape(
+            tf.reduce_sum(tf.reshape(expert_weights, [-1, num_mixtures]), 1),
+            [-1, vocab_size],
+            name='weight_sum')
+        
+    weight_size = vocab_size
+    correlationMat = tf.placeholder(tf.float32, [weight_size, weight_size], name="correlationMat")
+    regularizer = tf.trace(tf.matmul(tf.matmul(weight_sum, tf.matrix_inverse(correlationMat)), tf.transpose(weight_sum)))
+    tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, regularizer)
     
     gating_distribution = tf.nn.softmax(tf.reshape(
         gate_activations,

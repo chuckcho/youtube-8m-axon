@@ -8,12 +8,12 @@ data_path="/media/6TB/video/yt8m-v2/frame"
 axon_train_set="${data_path}/train???[13579].tfrecord"
 
 # be courteous, don't claim all GPU's! ;)
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=1
 
 python train.py \
   --num_gpu=1 \
   --train_data_pattern="${axon_train_set}" \
-  --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe-regularize-moe-experts \
+  --train_dir=gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe-regularize-moe-experts-10iter \
   --model=NetVLADModelLF \
   --frame_features=True \
   --feature_names="rgb,audio" \
