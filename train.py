@@ -350,8 +350,8 @@ def build_graph(reader,
         print(FLAGS.distillation_input_path)
 
     				
-        place_tf_keys = tf.placeholder(tf.string, shape=np.array(pred_dict.keys()).shape, name='place_tf_keys')
-        place_tf_vals = tf.placeholder(tf.string, shape=np.array(pred_dict.values()).shape, name='place_tf_vals')
+        place_tf_keys = tf.placeholder(tf.string, shape=np.array(list(pred_dict.keys())).shape, name='place_tf_keys')
+        place_tf_vals = tf.placeholder(tf.string, shape=np.array(list(pred_dict.values())).shape, name='place_tf_vals')
 
         set_keys = tf.Variable(place_tf_keys)
         set_vals = tf.Variable(place_tf_vals) 
@@ -380,12 +380,12 @@ def build_graph(reader,
         top_k = tf.shape(scores_tensor)[1]
         #seq = tf.range(batch_size, dtype=tf.int64)
         #row_idx = tf.expand_dims(tf.reshape(tf.tile(tf.reshape(seq, (-1, 1)), (1, top_k))), -1)
-        row_idx = tf_repeat(tf.range(batch_size, dtype=tf.int64), top_k)
+        row_idx = tf_repeat(tf.range(batch_size * num_towers, dtype=tf.int64), top_k)
       
         # Concat labels tensor and row indices to form indices matrix
         indices = tf.concat([labels_tensor, row_idx], axis=1)
 
-        shape = tf.constant([num_classes, batch_size], dtype=tf.int64)
+        shape = tf.constant([num_classes, batch_size * num_towers], dtype=tf.int64)
         distillation_predictions = tf.transpose(tf.scatter_nd(indices, updates, shape))
         #tmp_distill_pred = tf.pow(distillation_predictions, 1 / set_temperature)
         #distillation_predictions = tmp_distill_pred / tf.tile(tf.expand_dims(tf.reduce_sum(tmp_distill_pred, axis=1), -1), (1, num_classes))
@@ -429,7 +429,7 @@ def build_graph(reader,
 
             if FLAGS.distillation_as_input:
               p = FLAGS.distillation_percent
-              print "distillation_percent =", p
+              logging.info("distillation_percent =", p)
               if p <= 0:
                 label_loss = label_loss_fn.calculate_loss(predictions, tower_labels[i])
               elif p >= 1:
@@ -439,7 +439,7 @@ def build_graph(reader,
                 label_loss = label_loss_fn.calculate_loss(predictions, tower_labels[i]) * (1.0 - p) \
                          + tf.pow(tf.cast(set_temperature, tf.float32), 2.0)*label_loss_fn.calculate_loss(predictions, tower_distill_preds[i] ) * p
             else:
-              print "using original loss"
+              logging.info("using original loss")
               label_loss = label_loss_fn.calculate_loss(predictions, tower_labels[i])
 
           if "regularization_loss" in result.keys():
@@ -602,8 +602,6 @@ class Trainer(object):
           labels_scores_tensor = tf.get_collection("labels_scores_tensor")
       
           pred_dict, num_keys, len_vals = build_distillation_dict(FLAGS.distillation_input_path)
-          #place_tf_keys = tf.get_default_graph().get_tensor_by_name("place_tf_keys:0")
-          #place_tf_vals = tf.get_default_graph().get_tensor_by_name("place_tf_vals:0")
           place_tf_keys = tf.get_default_graph().get_tensor_by_name("distill_hashtable/place_tf_keys:0")
           place_tf_vals = tf.get_default_graph().get_tensor_by_name("distill_hashtable/place_tf_vals:0")
         
@@ -614,7 +612,7 @@ class Trainer(object):
 
 
     if FLAGS.distillation_as_input:
-      init_distill_dict = { place_tf_keys:pred_dict.keys(), place_tf_vals: pred_dict.values(), temperature: [1.0] }
+      init_distill_dict = { place_tf_keys: list(pred_dict.keys()), place_tf_vals: list(pred_dict.values()), temperature: [1.0] }
     else:
       init_distill_dict = { temperature: [1.0] }
 
@@ -710,8 +708,8 @@ class Trainer(object):
           else:
             logging.info("training step " + str(global_step_val) + " | Loss: " +
               ("%.2f" % loss_val) + " Examples/sec: " + ("%.2f" % examples_per_second))
-      except: #tf.errors.OutOfRangeError:
-        print('----> training broke')
+      except Exception as e: #tf.errors.OutOfRangeError:
+        logging.error('----> training broke with exception', e)
         import numpy as np
         data_val, values_val, labels_scores_tensor_val = sess.run([data, values, labels_scores_tensor])
         lc = list(np.squeeze(labels_scores_tensor_val))
