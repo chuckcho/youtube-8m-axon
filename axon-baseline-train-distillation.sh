@@ -12,7 +12,7 @@ axon_train_set="${data_path}/train????.tfrecord,${data_path}/validate???[0123467
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 python train.py \
-  --num_gpu=1 \
+  --num_gpu=$1 \
   --train_data_pattern="${axon_train_set}" \
   --train_dir=distill-vlad-32-1p0-ssr-ensemble \
   --model=NetVLADModelLF \
@@ -29,7 +29,7 @@ python train.py \
   --base_learning_rate=0.0004 \
   --learning_rate_decay=0.8 \
   --max_step=500000 \
-  --batch_size=32 \
+  --batch_size=$2 \
   --distillation_as_input=True \
   --distillation_percent=1.0 \
   --distillation_input_path=inference-on-train-and-val0-4+6-9-ensemble-14models-ljames-weighted-top50-noheader.csv
