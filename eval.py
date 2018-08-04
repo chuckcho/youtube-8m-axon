@@ -51,6 +51,7 @@ if __name__ == "__main__":
   flags.DEFINE_integer("num_readers", 8,
                        "How many threads to use for reading input files.")
   flags.DEFINE_boolean("run_once", True, "Whether to run eval only once.")
+  flags.DEFINE_boolean("v2017", False, "2017 version (no 'tower' in variable name")
   flags.DEFINE_integer("top_k", 20, "How many predictions to output per video.")
   flags.DEFINE_integer("check_point", -1,
                        "Model checkpoint to load, -1 for latest.")
@@ -132,7 +133,7 @@ def build_graph(reader,
   # Normalize input features.
   model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
 
-  with tf.variable_scope("tower"):
+  if FLAGS.v2017:
     result = model.create_model(model_input,
                                 num_frames=num_frames,
                                 vocab_size=reader.num_classes,
@@ -144,6 +145,19 @@ def build_graph(reader,
       label_loss = result["loss"]
     else:
       label_loss = label_loss_fn.calculate_loss(predictions, labels_batch)
+  else:
+    with tf.variable_scope("tower"):
+      result = model.create_model(model_input,
+                                  num_frames=num_frames,
+                                  vocab_size=reader.num_classes,
+                                  labels=labels_batch,
+                                  is_training=False)
+      predictions = result["predictions"]
+      tf.summary.histogram("model_activations", predictions)
+      if "loss" in result.keys():
+        label_loss = result["loss"]
+      else:
+        label_loss = label_loss_fn.calculate_loss(predictions, labels_batch)
 
   tf.add_to_collection("global_step", global_step)
   tf.add_to_collection("loss", label_loss)

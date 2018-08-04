@@ -229,8 +229,10 @@ def get_input_data_tensors(reader,
   """
   logging.info("Using batch size of " + str(batch_size) + " for training.")
   with tf.name_scope("train_input"):
-    if ',' in data_pattern:
-      data_patterns = data_pattern.split(',')
+
+    # support multiple patterns separatedly by a comma ","
+    if "," in data_pattern:
+      data_patterns = data_pattern.split(",")
       files = []
       for data_pattern in data_patterns:
           files.extend(gfile.Glob(data_pattern))
@@ -416,6 +418,7 @@ def build_graph(reader,
             tower_inputs[i],
             num_frames=tower_num_frames[i],
             vocab_size=reader.num_classes,
+            is_training=True,
             labels=tower_labels[i])
           for variable in slim.get_model_variables():
             tf.summary.histogram(variable.op.name, variable)
@@ -826,7 +829,7 @@ class Trainer(object):
                  batch_size=FLAGS.batch_size,
                  num_epochs=FLAGS.num_epochs)
 
-    return tf.train.Saver(max_to_keep=0, keep_checkpoint_every_n_hours=0.25)
+    return tf.train.Saver(max_to_keep=0, keep_checkpoint_every_n_hours=2)
 
 
 def get_reader():

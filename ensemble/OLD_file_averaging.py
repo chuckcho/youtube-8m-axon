@@ -12,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
+'''
+This is an obsolete script from https://github.com/antoine77340/Youtube-8M-WILLOW/blob/master/file_averaging.py
+For large inference files or for many files, this script is likely to fail because it loads all the inferences at the same time.
+'''
 
 import os
 from collections import defaultdict, Counter
 import pickle
 import pandas as pd
 
-SUBMIT_PATH = ''
+SUBMIT_PATH = '/media/TB2/chuck/__MODEL_VAULT__'
 SIGFIGS = 6
 
 def read_models(model_weights, blend=None):
@@ -34,7 +36,7 @@ def read_models(model_weights, blend=None):
                 id, r = l.split(',')
                 r = r.split(' ')
                 n = len(r) // 2
-                for i in range(0, n, 2):
+                for i in range(0, n * 2, 2):
                     k = int(r[i])
                     v = int(10**(SIGFIGS - 1) * float(r[i+1]))
                     blend[id][k] += w * v
@@ -52,14 +54,13 @@ def write_models(blend, file_name, total_weight):
     return None
 
 
-model_pred = {'test-gatednetvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe': 1
-                  , 'test-GRU-0002-1200-2': 1
-                  , 'test-gatednetfvLF-128k-1024-80-0002-300iter-norelu-basic-gatedmoe': 1
-                  , 'test-gateddboflf-4096-1024-80-0002-300iter': 1
-                  , 'test-softdboflf-8000-1024-80-0002-300iter': 1
-                  , 'test-gatedlightvladLF-256k-1024-80-0002-300iter-norelu-basic-gatedmoe': 1
-                  , 'test-lstm-0002-val-150-random': 1
-                 }
+model_pred = {
+        'inference-on-train-and-val0-4+6-9-model03-02-cp473348-top50': 1,
+        'inference-on-train-and-val0-4+6-9-model05-02-cp800020-top50': 1,
+        'inference-on-train-and-val0-4+6-9-model06-02-cp173998-top50': 1,
+        'inference-on-train-and-val0-4+6-9-model07-01-cp380325-top50': 1,
+        'inference-on-train-and-val0-4+6-9-model07-02-cp243673-top50': 1,
+        }
 
 avg = read_models(model_pred)
-write_models(avg, 'WILLOW_submission', sum(model_pred.values()))
+write_models(avg, 'inference-ens5-0302-0502-0602-0701-0702', sum(model_pred.values()))
