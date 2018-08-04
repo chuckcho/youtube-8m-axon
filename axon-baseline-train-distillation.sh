@@ -14,7 +14,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 python train.py \
   --num_gpu=1 \
   --train_data_pattern="${axon_train_set}" \
-  --train_dir=distill-vlad-32-1p0 \
+  --train_dir=distill-weights-shwan \
   --model=NetVLADModelLF \
   --frame_features=True \
   --feature_names="rgb,audio" \

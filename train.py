@@ -583,12 +583,12 @@ class Trainer(object):
 
     logging.info('---> line 434 in train.py')
     with tf.Graph().as_default() as graph:
-      if meta_filename:
-        saver = self.recover_model(meta_filename)
+      #if meta_filename:
+      #  saver = self.recover_model(meta_filename)
 
       with tf.device(device_fn):
-        if not meta_filename:
-          saver = self.build_model(self.model, self.reader)
+        #if not meta_filename:
+        saver = self.build_model(self.model, self.reader)
 
         global_step = tf.get_collection("global_step")[0]
         loss = tf.get_collection("loss")[0]
