@@ -721,7 +721,7 @@ class Trainer(object):
                 (global_step_val - self.last_model_export_step
                  >= self.export_model_steps))
 
-            if False and self.is_master and time_to_export:
+            if self.is_master and time_to_export:
               save_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
               self.export_model(global_step_val, saver, save_path, sess)
               self.last_model_export_step = global_step_val
