@@ -642,6 +642,7 @@ class Trainer(object):
       #initialize table
     with tf.Session(graph=graph, config=self.config) as sess:
       sess.run([init_op, tf.local_variables_initializer()], init_distill_dict) 
+      sess.run(tf.tables_initializer())
       ckpt = tf.train.get_checkpoint_state(self.train_dir)
       if ckpt and ckpt.model_checkpoint_path:
           tf.logging.info('Restoring variables from: %s', ckpt.model_checkpoint_path)
