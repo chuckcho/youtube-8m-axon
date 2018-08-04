@@ -33,6 +33,9 @@ from tensorflow.python.client import device_lib
 import utils
 from tensorflow.python.ops.lookup_ops import HashTable, KeyValueTensorInitializer
 
+import numpy as np
+import cmath
+
 FLAGS = flags.FLAGS
 
 
@@ -392,7 +395,6 @@ def build_graph(reader,
 
 
 
-
   tower_inputs = tf.split(model_input, num_towers)
   tower_labels = tf.split(labels_batch, num_towers)
   if FLAGS.distillation_as_input:
@@ -402,6 +404,8 @@ def build_graph(reader,
   tower_predictions = []
   tower_label_losses = []
   tower_reg_losses = []
+
+  omega_matrix = tf.placeholder(tf.float32, [num_classes, num_classes], "omega_matrix")
   for i in range(num_towers):
     # For some reason these 'with' statements can't be combined onto the same
     # line. They have to be nested.
@@ -449,6 +453,9 @@ def build_graph(reader,
           reg_losses = tf.losses.get_regularization_losses()
           if reg_losses:
             reg_loss += tf.add_n(reg_losses)
+
+          weight_sum = tf.get_default_graph().get_tensor_by_name("tower/weight_sum:0")
+          reg_loss += tf.trace(tf.matmul(tf.matmul(weight_sum, tf.matrix_inverse(omega_matrix)), tf.transpose(weight_sum)))
 
           tower_reg_losses.append(reg_loss)
 
@@ -579,8 +586,6 @@ class Trainer(object):
         if not meta_filename:
           saver = self.build_model(self.model, self.reader)
 
-
-
         global_step = tf.get_collection("global_step")[0]
         loss = tf.get_collection("loss")[0]
         predictions = tf.get_collection("predictions")[0]
@@ -604,36 +609,50 @@ class Trainer(object):
         
         temperature = tf.get_default_graph().get_tensor_by_name("temperature:0")
 
+        place_omega_matrix = tf.get_default_graph().get_tensor_by_name("omega_matrix:0")
+        omega_matrix_val = np.identity(3862)
+        experts_weight = tf.get_default_graph().get_tensor_by_name("tower/weight_sum:0")
+
 
     if FLAGS.distillation_as_input:
       init_distill_dict = { place_tf_keys:pred_dict.keys(), place_tf_vals: pred_dict.values(), temperature: [1.0] }
     else:
       init_distill_dict = { temperature: [1.0] }
 
-    sv = tf.train.Supervisor(
-        graph,
-        logdir=self.train_dir,
-        init_op=init_op,
-        is_chief=self.is_master,
-        global_step=global_step,
-        save_model_secs=15 * 60,
-        save_summaries_secs=120,
-        saver=saver,
-        init_feed_dict=init_distill_dict)
-    
+    #sv = tf.train.Supervisor(
+    #    graph,
+    #    logdir=self.train_dir,
+    #    init_op=init_op,
+    #    is_chief=self.is_master,
+    #    global_step=global_step,
+    #    save_model_secs=15 * 60,
+    #    save_summaries_secs=120,
+    #    saver=saver,
+    #    init_feed_dict=init_distill_dict)
+
+    summary_writer = tf.summary.FileWriter(self.train_dir + '/logs', graph=graph)
+    coord = tf.train.Coordinator() 
  
     logging.info("%s: Starting managed session.", task_as_string(self.task))
-    with sv.managed_session(target, config=self.config) as sess:
+    #with sv.managed_session(target, config=self.config) as sess:
       #initialize table
-      
+    with tf.Session(graph=graph, config=self.config) as sess:
+      sess.run([init_op, tf.local_variables_initializer()], init_distill_dict) 
+      ckpt = tf.train.get_checkpoint_state(self.train_dir)
+      if ckpt and ckpt.model_checkpoint_path:
+          tf.logging.info('Restoring variables from: %s', ckpt.model_checkpoint_path)
+          saver.restore(sess, ckpt.all_model_checkpoint_paths[-1])
+      threads = tf.train.queue_runner.start_queue_runners(sess=sess, coord=coord)
       try:
         logging.info("%s: Entering training loop.", task_as_string(self.task))
-        while (not sv.should_stop()) and (not self.max_steps_reached):
+        while (not coord.should_stop()) and (not self.max_steps_reached):
           batch_start_time = time.time()
-          _, global_step_val, loss_val, predictions_val, labels_val = sess.run(
-              [train_op, global_step, loss, predictions, labels])
+          _, global_step_val, loss_val, predictions_val, labels_val, experts_weight_val = sess.run(
+                  [train_op, global_step, loss, predictions, labels, experts_weight], {place_omega_matrix: omega_matrix_val})
           seconds_per_batch = time.time() - batch_start_time
           examples_per_second = labels_val.shape[0] / seconds_per_batch
+
+          print experts_weight_val.shape
           
           ''' 
           print('vid', unused_video_id_val[0])
@@ -678,17 +697,17 @@ class Trainer(object):
               ("%.2f" % hit_at_one) + " PERR: " + ("%.2f" % perr) +
               " GAP: " + ("%.2f" % gap))
 
-            sv.summary_writer.add_summary(
+            summary_writer.add_summary(
                 utils.MakeSummary("model/Training_Hit@1", hit_at_one),
                 global_step_val)
-            sv.summary_writer.add_summary(
+            summary_writer.add_summary(
                 utils.MakeSummary("model/Training_Perr", perr), global_step_val)
-            sv.summary_writer.add_summary(
+            summary_writer.add_summary(
                 utils.MakeSummary("model/Training_GAP", gap), global_step_val)
-            sv.summary_writer.add_summary(
+            summary_writer.add_summary(
                 utils.MakeSummary("global_step/Examples/Second",
                                   examples_per_second), global_step_val)
-            sv.summary_writer.flush()
+            summary_writer.flush()
 
             # Exporting the model every x steps
             time_to_export = ((self.last_model_export_step == 0) or
@@ -696,7 +715,8 @@ class Trainer(object):
                  >= self.export_model_steps))
 
             if self.is_master and time_to_export:
-              self.export_model(global_step_val, sv.saver, sv.save_path, sess)
+              save_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
+              self.export_model(global_step_val, saver, save_path, sess)
               self.last_model_export_step = global_step_val
           else:
             logging.info("training step " + str(global_step_val) + " | Loss: " +
@@ -706,7 +726,9 @@ class Trainer(object):
                      task_as_string(self.task))
 
     logging.info("%s: Exited training loop.", task_as_string(self.task))
-    sv.Stop()
+    coord.request_stop()
+    coord.join(threads)
+    # sv.Stop()
 
   def export_model(self, global_step_val, saver, save_path, session):
 

@@ -127,6 +127,14 @@ class MoeModel(models.BaseModel):
         activation_fn=None,
         weights_regularizer=slim.l2_regularizer(l2_penalty),
         scope="experts")
+        
+    with tf.variable_scope('experts', reuse=True):
+        expert_weights = tf.get_variable('weights')
+
+    weight_sum = tf.reshape(
+            tf.reduce_sum(tf.reshape(expert_weights, [-1, num_mixtures]), 1),
+            [-1, vocab_size],
+            name='weight_sum')
 
     gating_distribution = tf.nn.softmax(tf.reshape(
         gate_activations,
