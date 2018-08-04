@@ -457,8 +457,9 @@ def build_graph(reader,
           if reg_losses:
             reg_loss += tf.add_n(reg_losses)
 
+          # add trace regularization to reg_loss
           weight_sum = tf.get_default_graph().get_tensor_by_name("tower/weight_sum:0")
-          reg_loss += tf.trace(tf.matmul(tf.matmul(weight_sum, tf.matrix_inverse(omega_matrix)), tf.transpose(weight_sum)))
+          reg_loss += 0.2 * tf.trace(tf.matmul(tf.matmul(weight_sum, tf.matrix_inverse(omega_matrix)), tf.transpose(weight_sum)))
 
           tower_reg_losses.append(reg_loss)
 
