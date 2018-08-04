@@ -652,8 +652,6 @@ class Trainer(object):
           seconds_per_batch = time.time() - batch_start_time
           examples_per_second = labels_val.shape[0] / seconds_per_batch
 
-          print experts_weight_val.shape
-          
           ''' 
           print('vid', unused_video_id_val[0])
  
@@ -684,6 +682,12 @@ class Trainer(object):
             self.max_steps_reached = True
 
           if self.is_master and global_step_val % 10 == 0 and self.train_dir:
+            start = time.time()
+            matSqrt = sqrtMat(np.matmul(np.transpose(experts_weight_val), experts_weight_val))
+            omega_matrix_val = matSqrt / np.trace(matSqrt)
+            print 'updated omega_matrix time', time.time() - start
+
+
             eval_start_time = time.time()
             hit_at_one = eval_util.calculate_hit_at_one(predictions_val, labels_val)
             perr = eval_util.calculate_precision_at_equal_recall_rate(predictions_val,
@@ -714,7 +718,7 @@ class Trainer(object):
                 (global_step_val - self.last_model_export_step
                  >= self.export_model_steps))
 
-            if self.is_master and time_to_export:
+            if False and self.is_master and time_to_export:
               save_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
               self.export_model(global_step_val, saver, save_path, sess)
               self.last_model_export_step = global_step_val
@@ -889,6 +893,11 @@ def start_server(cluster, task):
 
 def task_as_string(task):
   return "/job:%s/task:%s" % (task.type, task.index)
+
+def sqrtMat(mat): # mat has to be symmetric
+  D, V = np.linalg.eigh(mat)
+  return np.matmul(np.matmul(V, np.diag(map(cmath.sqrt, D))), V.T)
+  #return np.matmul(np.matmul(V, np.diag(np.sqrt(D))), V.T)
 
 def main(unused_argv):
   # Load the environment.
