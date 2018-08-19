@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
-inference_dir=/media/TB2/chuck/__MODEL_VAULT__
+# if env var is set, use it. otherwise specify here manually.
+if [[ ! -z "${INFDIR}" ]]; then
+  inference_dir=${INFDIR}
+else
+  inference_dir=/media/TB2/chuck/__MODEL_VAULT__
+fi
 post_fix=sorted-noheader
 
 # exclude the header (first line) and sort accordning to video id
