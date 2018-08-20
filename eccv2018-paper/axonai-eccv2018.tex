@@ -42,7 +42,7 @@ The goal of this YouTube-8M Video Understanding Challenge was to develop a machi
 
 % -----------------------------------------------------------------
 % -----------------------------------------------------------------
-\section{Challenge strategy}
+\section{Challenge strategy} \label{sec:strategy}
 Our overall plan for the Challenge was as follows:
 (1) designing or identifying a set of efficient and strong submodels;
 (2) ensembling predictions from all the submodels;
@@ -182,9 +182,9 @@ In addition to over-sampling, sub-sampling (random sampling) for classes with mo
 \end{figure}
 
 In YouTube-8M dataset we are provided with pre-extracted features.
-As for the video-level visual features, PCA, whitening and quantization has been performed on a DNN output per frame, and results are averaged over all available frames.
+As for the video-level visual features, PCA, whitening and quantization have been performed on a Inception-model deep feature (DNN output) per frame, and all the frame-level features are averaged.
 
-Data augmentation was performed inspired by \cite{devries2017} for the visual features only.
+Data augmentation was performed inspired by \cite{devries2017} on the video-level visual features due to memory and computation limitations.
 The simplest transform is to simply add small noise to the feature vector.
 \begin{equation}
 x'_i = x_i + \gamma Z, Z \sim \mathcal{N}(0, \sigma^2)
@@ -205,7 +205,7 @@ We used 0.5 for both $\lambda$'s and $\sigma$ value of 0.03 for the additive Gau
 
 The label frequencies (before and after over- and sub-sampling) are plotted in log-log scale Figure \ref{fig:numsamples}, both of which exhibit a Zipf-like distribution.
 \begin{figure}
-  \includegraphics[width=\linewidth]{./figures/new_num_samples_per_class.png}
+  \includegraphics[width=\linewidth]{./figures/new_num_samples_per_class_cropped.png}
   \caption{Label counts before and after data augmentation in feature space}
   \label{fig:numsamples}
 \end{figure}
@@ -271,6 +271,11 @@ The original paper \cite{jiang2018} suggests using alternating optimization algo
 For training of individual baseline models, we stopped training when a model starts to overfit slightly by monitoring validation GAP in the spirit of the finding from \cite{bober2017} and our own observations.
 For ensembles, we implemented (1) simple averaging (equal weights for all models), (2) per-model linearly-weighted average, (3) per-model and per-class linearly-weighted average.
 Among these ensembling methods, per-model weights provided the best performance improvement.
+
+To learn the per-model weights for ensembling, a dataset was made that comprised of each model's inference results on our validation set (one tenth of the original validation set as described in Section~\ref{sec:strategy}).
+Stochastic gradient descent (SGD) with the Adam optimizer was then used to minimize the mean-square-error (MSE) loss between a linear combination of the models' inferences and the ground truth.
+A custom initializer was used to make the model converge, typically in less than 10 epochs, on useful weights.
+The initializer used a normal distribution with a mean of $1/(\# \textrm{model})$ and standard deviation of 0.05 to approximate weights for MSE.
 Learned per-model weights (Table~\ref{tab:learned_weights}) look reasonable as (1) Gated NetVLAD was the strongest model in terms of GAP performance, and as (2) weights are roughly in a decreasing order from most powerful (Gated NetVLAD) to least powerful model (LSTM).
 
 \begin{table}[h!]
