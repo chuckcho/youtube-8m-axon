@@ -1,0 +1,23 @@
+kaggle competitions submissions -c youtube8m-2018
+fileName                                                                date                 description                                                  status    publicScore  privateScore
+----------------------------------------------------------------------  -------------------  -----------------------------------------------------------  --------  -----------  ------------
+test-pduan-latest-distill-weights-cp1006270-top20.csv                   2018-08-06 23:08:10  regularize_0.2_distillation_1006270                          complete  0.85593      0.85514
+test-distill-vlad-32-1p0-ssr-ensemble-cp75365-top20.csv                 2018-08-06 20:59:08  batch AI model distillation                                  complete  0.86304      0.86243
+test-distill-vlad-40-1p0-ssr-ensemble-inference-ln-cp1031873-top20.csv  2018-08-06 15:24:29  test-distill-vlad-40-1p0-ssr-ensemble-cp1031873-top20 model  complete  0.87329      0.87287
+test-distill-vlad-40-1p0-ssr-ensemble-cp979775-top20.csv                2018-08-06 04:56:53  distill-vlad-40-1p0-ssr-ensemble-cp979775                    complete  0.87314      0.87268
+test-distill-vlad-40-1p0-ssr-ensemble-cp979775-top20.csv                2018-08-05 20:37:46  distill-vlad-40-1p0-ssr-ensemble-cp979775                    complete  0.87314      0.87268
+test-distill-vlad-40-1p0-ssr-ensemble-cp647000-top20.csv                2018-08-05 16:33:17  distill-vlad-40-1p0-ssr-ensemble-cp647000 #2                 complete  0.81350      0.81259
+distill-vlad-40-1p0-ssr-ensemble-cp647000.tgz                           2018-08-04 23:02:22  model distill-vlad-40-1p0-ssr-ensemble-cp647000              error     None         None
+test-distill-vlad-40-1p0-ssr-ensemble-cp647000-top20.csv                2018-08-04 22:48:51  distill-vlad-40-1p0-ssr-ensemble-cp647000                    complete  0.81347      0.81269
+test-distill-vlad-40-1p0-ssr-ensemble-cp530010-top20.csv                2018-08-04 12:26:13  distill-vlad-40-1p0-ssr-ensemble-cp530010                    complete  0.87099      0.87054
+test-distill-vlad-40-1p0-ssr-ensemble-cp370010-top20.csv                2018-08-04 04:06:55  distill-vlad-40-1p0-ssr-ensemble-cp370010                    complete  0.86845      0.86803
+inference-on-test-ens28-ljames-weight.csv                               2018-08-02 05:55:19  28-model ensemble (lee james weight)                         complete  0.88794      0.88733
+inference-on-test-ens28-ljames-weight.csv                               2018-08-02 04:56:10  ---                                                          error     None         None
+file_ensemble_Test_01.csv                                               2018-08-01 03:56:29  testing local2dConv w/ 3 networks                            complete  0.85219      0.85140
+inference-ens28.csv                                                     2018-07-31 18:44:07  28-model ensemble                                            complete  0.88693      0.88631
+w-ens14-eq.csv                                                          2018-07-27 17:03:44  14 ens eq                                                    complete  0.88687      0.88622
+w-ens13-eq.csv                                                          2018-07-27 16:37:17  13 ens eq                                                    complete  0.88660      0.88596
+w-ens13-eq.csv                                                          2018-07-24 16:17:28  13 ens eq                                                    complete  0.88600      0.88539
+ensemble_unweighted_mse-4.csv                                           2018-07-24 00:57:07  unweighted ensembling w/ 4 models                            complete  0.85531      0.85451
+ensemble_weighted_mse-4.csv                                             2018-07-24 00:49:33  weighted ensembling w/ 4 models                              complete  0.85548      0.85471
+w-ens12-eq.csv                                                          2018-07-23 22:51:46  12 ens eq                                                    complete  0.88633      0.88573
