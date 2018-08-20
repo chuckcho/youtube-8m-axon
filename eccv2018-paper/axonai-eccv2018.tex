@@ -258,7 +258,7 @@ The second part is a regularization term to mitigate overfitting.
 
 The last part imposes a trace norm regularization term over the coefficients of the output layer $\boldsymbol{W}_{L-1}$ with the class relationships augmented as a matrix variable $\Omega$.
 The positive semidefinite constraint, $\Omega \succeq 0$ indicates that the class relationship matrix is viewed as the similarity measure of the semantic classes.
-The optimal $\Omega$ can be analytically derived as:
+The original paper \cite{jiang2018} suggests using alternating optimization algorithm to solve for both $\boldsymbol{W}$ and $\Omega$. After updating $\boldsymbol{W}$ using backpropagation, $\Omega$ can be updated as:
 \begin{equation}
         \Omega = \frac
         { ( \boldsymbol{W}_{L-1}^T \boldsymbol{W}_{L-1} )^\frac{1}{2}  }
